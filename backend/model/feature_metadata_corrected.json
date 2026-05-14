@@ -1,0 +1,116 @@
+{
+  "prolongued_decelerations": {
+    "type": "float",
+    "min": 0.0,
+    "max": 0.005,
+    "description": "Percentage of time with prolonged decelerations"
+  },
+  "abnormal_short_term_variability": {
+    "type": "float",
+    "min": 12.0,
+    "max": 87.0,
+    "description": "Percentage of time with abnormal short term variability"
+  },
+  "percentage_of_time_with_abnormal_long_term_variability": {
+    "type": "float",
+    "min": 0.0,
+    "max": 97.0,
+    "description": "Percentage of time with abnormal long term variability"
+  },
+  "histogram_mean": {
+    "type": "float",
+    "min": 73.0,
+    "max": 182.0,
+    "description": "Mean value of FHR histogram"
+  },
+  "histogram_mode": {
+    "type": "float",
+    "min": 60.0,
+    "max": 187.0,
+    "description": "Mode of FHR histogram"
+  },
+  "histogram_median": {
+    "type": "float",
+    "min": 77.0,
+    "max": 186.0,
+    "description": "Median value of FHR histogram"
+  },
+  "accelerations": {
+    "type": "float", 
+    "min": 0.0,
+    "max": 0.019,
+    "description": "Number of accelerations per second"
+  },
+  "histogram_variance": {
+    "type": "float",
+    "min": 0.0,
+    "max": 269.0,
+    "description": "Variance of FHR histogram"
+  },
+  "baseline value": {
+    "type": "float",
+    "min": 106.0,
+    "max": 160.0,
+    "description": "Baseline fetal heart rate (beats per minute)"
+  },
+  "mean_value_of_short_term_variability": {
+    "type": "float",
+    "min": 0.2,
+    "max": 7.0,
+    "description": "Mean value of short term variability"
+  },
+  "uterine_contractions": {
+    "type": "float",
+    "min": 0.0,
+    "max": 0.015,
+    "description": "Number of uterine contractions per second"
+  },
+  "histogram_min": {
+    "type": "float",
+    "min": 50.0,
+    "max": 159.0,
+    "description": "Minimum value of FHR histogram"
+  },
+  "mean_value_of_long_term_variability": {
+    "type": "float",
+    "min": 0.0,
+    "max": 91.0,
+    "description": "Mean value of long term variability"
+  },
+  "light_decelerations": {
+    "type": "float",
+    "min": 0.0,
+    "max": 0.015,
+    "description": "Number of light decelerations per second"
+  },
+  "histogram_width": {
+    "type": "float",
+    "min": 3.0,
+    "max": 180.0,
+    "description": "Width of FHR histogram"
+  },
+  "histogram_tendency": {
+    "type": "float",
+    "min": -1.0,
+    "max": 1.0,
+    "description": "Tendency of histogram (-1=left asymmetric, 0=symmetric, 1=right asymmetric)"
+  },
+  "severe_decelerations": {
+    "type": "float",
+    "min": 0.0,
+    "max": 0.001,
+    "description": "Number of severe decelerations per second"
+  },
+  "histogram_number_of_peaks": {
+    "type": "float",
+    "min": 0.0,
+    "max": 18.0,
+    "description": "Number of histogram peaks"
+  },
+  "fetal_movement": {
+    "type": "float",
+    "min": 0.0,
+    "max": 0.481,
+    "description": "Number of fetal movements per second"
+  }
+}

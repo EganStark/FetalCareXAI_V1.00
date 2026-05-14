@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetal Health Prediction</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>Fetal Health Prediction</h1>
+            <p>ML-powered fetal health classification with explainable predictions</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Input Form Section -->
+            <section class="card">
+                <h2>Input Features</h2>
+                <p class="section-description">Enter the fetal health monitoring parameters below:</p>
+                
+                <form id="predictionForm" class="form">
+                    <div id="formFields" class="form-fields">
+                        <!-- Dynamic form fields will be inserted here -->
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="button" id="clearBtn" class="btn btn-secondary">Clear All</button>
+                        <button type="button" id="previewBtn" class="btn btn-ghost">Preview</button>
+                        <button type="submit" id="predictBtn" class="btn btn-primary">Predict</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Preview Section -->
+            <section id="previewSection" class="card hidden">
+                <h2>Input Preview</h2>
+                <div id="previewContent" class="preview-content">
+                    <!-- Preview content will be inserted here -->
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="resultsSection" class="card hidden">
+                <h2>Prediction Results</h2>
+                <div class="results-content">
+                    <div id="predictionResult" class="prediction-result">
+                        <!-- Prediction result will be inserted here -->
+                    </div>
+                    
+                    <div class="result-actions">
+                        <button id="explainBtn" class="btn btn-primary">Generate Explanation</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Explanation Section -->
+            <section id="explanationSection" class="card hidden">
+                <h2>AI Explanation (LIME)</h2>
+                <p class="section-description">Understanding why the model made this prediction:</p>
+                <div id="explanationContent" class="explanation-content">
+                    <!-- Explanation content will be inserted here -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>Processing...</p>
+            </div>
+        </div>
+
+        <!-- Error Modal -->
+        <div id="errorModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Error</h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="errorMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary modal-close">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

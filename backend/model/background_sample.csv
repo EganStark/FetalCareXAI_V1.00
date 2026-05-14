@@ -1,0 +1,11 @@
+baseline_value,accelerations,uterine_contractions,light_decelerations,mean_value_of_short_term_variability,mean_value_of_long_term_variability,histogram_width,histogram_min,histogram_number_of_peaks,histogram_mean,histogram_variance,histogram_tendency,prolongued_decelerations_abnormal_short_term_variability,prolongued_decelerations_percentage_of_time_with_abnormal_long_term_variability
+120.0,0.0,0.0,0.0,0.5,9.4,64.0,102.0,2.0,136.0,12.4,0.0,0.0,43.0
+132.0,0.006,0.006,0.003,17.0,2.1,130.0,68.0,4.0,198.0,12.4,1.0,0.0,0.0
+133.0,0.003,0.008,0.003,16.0,2.1,130.0,68.0,4.0,198.0,13.4,1.0,0.0,0.0
+134.0,0.003,0.008,0.003,16.0,2.4,53.0,109.0,2.0,135.0,9.8,0.0,0.0,0.0
+132.0,0.007,0.008,0.0,16.0,2.4,53.0,109.0,2.0,135.0,9.8,0.0,0.0,0.0
+133.0,0.003,0.003,0.0,6.0,1.4,20.0,106.0,2.0,125.0,12.9,0.0,0.0,0.0
+134.0,0.003,0.003,0.003,6.0,1.4,20.0,106.0,2.0,125.0,12.9,0.0,0.0,0.0
+132.0,0.0,0.0,0.0,4.0,2.1,81.0,109.0,1.0,136.0,13.8,-1.0,0.0,0.0
+133.0,0.008,0.005,0.0,4.0,4.1,32.0,118.0,6.0,154.0,13.7,1.0,0.0,0.0
+140.0,0.0,0.003,0.0,5.0,10.4,130.0,106.0,2.0,136.0,11.7,1.0,0.0,0.0

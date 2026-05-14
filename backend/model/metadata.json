@@ -1,0 +1,21 @@
+{
+  "timestamp": "20250823_215101",
+  "best_model_name": "LightGBM",
+  "metrics": {
+    "accuracy": 0.966903073286052,
+    "macro_f1": 0.9427483263548838,
+    "roc_auc_ovr": NaN
+  },
+  "versions": {
+    "python": "3.12.11",
+    "numpy": "1.26.4",
+    "pandas": "2.2.2",
+    "sklearn": "1.3.2",
+    "imblearn": "0.11.0",
+    "xgboost": "3.0.4",
+    "lightgbm": "4.6.0",
+    "shap": "0.48.0",
+    "lime": null
+  },
+  "notes": "Model expects inputs scaled with scaler.pkl and columns ordered per features.pkl."
+}
