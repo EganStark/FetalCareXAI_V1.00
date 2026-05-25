@@ -4,7 +4,6 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-2.3.3-green?logo=flask&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-yellow)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 
 **🎯 AI-Powered Fetal Health Classification with Explainable Predictions**
