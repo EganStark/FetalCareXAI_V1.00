@@ -1,67 +1,107 @@
-# Evaluation artifacts needed
+# Model evaluation and lineage
 
-## Current status
+This document records the evidence behind the production model card. It keeps
+verified results separate from historical project material and prevents metrics
+from being presented without their evaluation context.
 
-Recovered and verified:
+## Evidence status
 
-- Original 2,126-row CSV and matching production model artifacts
-- UCI source, DOI, citation, and CC BY 4.0 license
-- Duplicate removal followed by a stratified 80/20 split with `random_state=42`
-- A 423-row held-out set whose accuracy and macro F1 exactly match model metadata
-- Held-out confusion matrix, per-class metrics, ROC AUC, Brier score, and ECE
+| Artifact or claim | Status | Verification |
+|---|---|---|
+| Production model, scaler, feature order, and labels | Verified | Source and project files have matching SHA-256 hashes |
+| Dataset | Verified | 2,126-row CSV matches documented UCI structure |
+| Dataset source and license | Verified | UCI DOI and CC BY 4.0 license |
+| Duplicate policy | Verified | `drop_duplicates(keep='first')` |
+| Evaluation split | Verified | Stratified 80/20, `random_state=42` |
+| Held-out accuracy and macro F1 | Verified | Reconstruction exactly matches `metadata.json` |
+| Production export script | Not recovered | Historical notebook does not export the 19-feature artifact |
 
-Still missing:
+## Dataset identity
 
-- The exact script or notebook cell that exported the 19-feature production artifacts
-- Resolution of the historical notebook's 15-feature experiment versus the 19-feature artifact
-- Resolution of the poster narrative's older 96.45% value versus its final 96.69% table
+- Name: Cardiotocography
+- Records: 2,126
+- Measured predictors: 21
+- Production model predictors: 19
+- Missing values: 0
+- Duplicate rows before cleaning: 13
+- Dataset SHA-256: `90bd62b95020ffa466f01a2942a79cf6b8b04cc5ac680144d705002d893f6622`
+- Excluded predictors: `histogram_max`, `histogram_number_of_zeroes`
 
-The dashboard intentionally shows only evidence preserved with the current model.
-To regenerate the missing confusion matrix, class balance, per-class metrics, and
-calibration results, provide the following artifacts.
+**Citation:** Campos, D. & Bernardes, J. (2000). *Cardiotocography*
+[Dataset]. UCI Machine Learning Repository.
+<https://doi.org/10.24432/C51S4N>
 
-## Preferred option: reproducible training package
-
-1. `fetal_health.csv`
-   - The same 19 feature columns listed by `backend/model/features.pkl`.
-   - One target column named `fetal_health` with labels `1`, `2`, or `3`.
-   - Remove names, record IDs, dates, institutions, and other identifiers first.
-2. The original training notebook or Python script.
-3. The exact train/test split indices, or the split method and random seed.
-4. Any preprocessing, resampling, feature selection, or class-weight settings.
-
-## Minimum option: held-out predictions
-
-Provide `test_predictions.csv` with these columns:
+## Reconstructed split
 
 ```text
-y_true,y_pred,prob_normal,prob_suspect,prob_pathological
-1,1,0.94,0.05,0.01
-2,2,0.12,0.81,0.07
+Original rows           2,126
+Rows after deduplication 2,113
+Training rows            1,690
+Held-out test rows         423
+Split                     80/20, stratified
+Random state              42
 ```
 
-This is enough to calculate:
+Test-index fingerprint:
+`de1bcdca552edb2e1785c48d306321b749a8fd27204bc7963e156fa4d2dfd274`
 
-- Confusion matrix
-- Class counts and proportions for the held-out set
-- Precision, recall, and F1 for each class
-- Macro and weighted averages
-- ROC AUC where mathematically valid
-- Reliability curves, Brier score, and expected calibration error
+## Held-out performance
 
-It is not enough to reproduce training or verify dataset provenance.
+| Metric | Value |
+|---|---:|
+| Accuracy | 0.966903 |
+| Macro F1 | 0.942748 |
+| Weighted F1 | 0.965545 |
+| ROC AUC OVR | 0.989928 |
+| Log loss | 0.166730 |
+| Multiclass Brier score | 0.063149 |
+| 10-bin expected calibration error | 0.027322 |
 
-## Dataset documentation
+<details>
+<summary><strong>Confusion matrix and class report</strong></summary>
 
-Also provide, where known:
+| Actual \ Predicted | Normal | Suspect | Pathological |
+|---|---:|---:|---:|
+| Normal | 329 | 1 | 0 |
+| Suspect | 11 | 46 | 1 |
+| Pathological | 1 | 0 | 34 |
 
-- Dataset name and authoritative source URL or citation
-- License and allowed use
-- Collection setting and time period
-- Inclusion/exclusion criteria
-- Sample count before and after cleaning
-- Missing-value handling
-- Duplicate handling
-- Known demographic or institutional limitations
+| Class | Precision | Recall | F1 | Support |
+|---|---:|---:|---:|---:|
+| Normal | 0.964809 | 0.996970 | 0.980626 | 330 |
+| Suspect | 0.978723 | 0.793103 | 0.876190 | 58 |
+| Pathological | 0.971429 | 0.971429 | 0.971429 | 35 |
 
-Do not add private or identifiable patient information to this repository.
+</details>
+
+## Historical-material notes
+
+The supplied historical notebook includes a visible 15-feature LightGBM
+experiment, while the serialized production artifact expects 19 features. The
+capstone poster also contains an older 96.45% narrative result alongside a final
+96.69% LightGBM table.
+
+The application reports 96.69% because:
+
+1. The production metadata records `0.966903073286052`.
+2. The reconstructed 423-row held-out split produces the same value exactly.
+3. Its reconstructed macro F1 also matches metadata exactly.
+4. The poster's final comparison table reports 96.69%.
+
+These checks establish evaluation lineage without claiming that the historical
+15-feature notebook is the production export pipeline.
+
+## Requirements for future model versions
+
+A replacement model should include:
+
+- Versioned training and export code
+- Dataset citation, license, and fingerprint
+- Exact ordered features and preprocessing artifacts
+- Reproducible split indices or held-out predictions
+- Confusion matrix and per-class precision, recall, F1, and support
+- Probability calibration evidence
+- Documented intended use, exclusions, and limitations
+
+Do not commit identifiable patient data or evaluate a replacement solely on its
+training set.
