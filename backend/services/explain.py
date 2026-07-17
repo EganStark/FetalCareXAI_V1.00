@@ -24,6 +24,7 @@ class ExplanationService:
             prediction_service: Instance of PredictionService
         """
         self.prediction_service = prediction_service
+        self.graph_session_id = str(uuid.uuid4())[:8]
         self.feature_names = self._get_feature_names()
         self.background_data = self._load_background_data()
         self.explainer = self._create_explainer()
@@ -303,7 +304,7 @@ class ExplanationService:
             
             # Generate unique filename
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f'lime_explanation_{instance_id}_{timestamp}.png'
+            filename = f'lime_explanation_{self.graph_session_id}_{instance_id}_{timestamp}.png'
             filepath = os.path.join(os.path.dirname(__file__), '..', 'static', 'graphs', filename)
             
             # Save the plot with high quality
@@ -325,6 +326,9 @@ class ExplanationService:
                 current_time = time.time()
                 # Remove files older than 1 hour
                 for filename in os.listdir(graphs_dir):
+                    # Never remove repository assets or files from another app process.
+                    if self.graph_session_id not in filename:
+                        continue
                     filepath = os.path.join(graphs_dir, filename)
                     if os.path.isfile(filepath):
                         file_age = current_time - os.path.getmtime(filepath)

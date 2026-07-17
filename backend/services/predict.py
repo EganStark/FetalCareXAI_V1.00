@@ -4,7 +4,6 @@ Prediction service for fetal health classification
 import joblib
 import json
 import os
-import pandas as pd
 import numpy as np
 from typing import Dict, Any, Tuple
 
@@ -167,6 +166,36 @@ class PredictionService:
         
         return scaled_features
     
+    def predict_details(self, data: Dict[str, float]) -> Dict[str, Any]:
+        """Return the predicted class together with calibrated model probabilities."""
+        if self.model is None:
+            raise RuntimeError("Model not loaded")
+
+        features = self._prepare_features(data)
+        probabilities = self.model.predict_proba(features)[0]
+        predicted_class_idx = int(np.argmax(probabilities))
+
+        mapping = {0: (1, 'Normal'), 1: (2, 'Suspect'), 2: (3, 'Pathological')}
+        class_id, class_label = mapping[predicted_class_idx]
+
+        # The serialized mapping is authoritative when it has the expected shape.
+        if self.label_mapping and predicted_class_idx in self.label_mapping:
+            mapped = self.label_mapping[predicted_class_idx]
+            class_id = int(mapped.get('class_id', class_id))
+            class_label = mapped.get('class_name', class_label)
+
+        labels = ['Normal', 'Suspect', 'Pathological']
+        probability_map = {
+            label: round(float(probability), 6)
+            for label, probability in zip(labels, probabilities)
+        }
+        return {
+            'class_id': class_id,
+            'class_label': class_label,
+            'confidence': round(float(probabilities[predicted_class_idx]), 6),
+            'probabilities': probability_map,
+        }
+
     def predict(self, data: Dict[str, float]) -> Tuple[int, str]:
         """
         Make prediction on input data
@@ -177,62 +206,8 @@ class PredictionService:
         Returns:
             Tuple of (class_id, class_label)
         """
-        if self.model is None:
-            raise RuntimeError("Model not loaded")
-        
-        # Prepare features using the correct scaler and feature order
-        features = self._prepare_features(data)
-        print(f"Input features shape: {features.shape}")
-        print(f"Input features sample: {features[0][:5]}")  # First 5 features
-        
-        # Make prediction using the scaled features
-        prediction = self.model.predict(features)[0]
-        probabilities = self.model.predict_proba(features)[0]
-        
-        print(f"Raw model prediction: {prediction} (type: {type(prediction)})")
-        print(f"Model probabilities: [Class 0: {probabilities[0]:.4f}, Class 1: {probabilities[1]:.4f}, Class 2: {probabilities[2]:.4f}]")
-        
-        # Get the predicted class (highest probability)
-        predicted_class_idx = np.argmax(probabilities)
-        confidence = probabilities[predicted_class_idx]
-        
-        print(f"Predicted class index: {predicted_class_idx}")
-        print(f"Confidence: {confidence:.4f}")
-        
-        # Map prediction to class ID and label
-        # Check what type of mapping we have
-        if self.label_mapping is not None:
-            # Use pickle mapping if available
-            print(f"Using pickle label mapping: {self.label_mapping}")
-            if predicted_class_idx in self.label_mapping:
-                class_id = self.label_mapping[predicted_class_idx]['class_id']
-                class_label = self.label_mapping[predicted_class_idx]['class_name']
-            else:
-                # Fallback mapping
-                mapping = {0: (1, 'Normal'), 1: (2, 'Suspect'), 2: (3, 'Pathological')}
-                class_id, class_label = mapping.get(predicted_class_idx, (1, 'Normal'))
-        elif self.label_map is not None:
-            # Use JSON mapping
-            print(f"Using JSON label mapping: {self.label_map}")
-            # Convert predicted class to string to match JSON keys
-            str_prediction = str(predicted_class_idx)
-            if str_prediction in self.label_map:
-                class_label = self.label_map[str_prediction]
-                # Map label to ID
-                label_to_id = {'Normal': 1, 'Suspect': 2, 'Pathological': 3}
-                class_id = label_to_id.get(class_label, 1)
-            else:
-                # Fallback mapping
-                mapping = {0: (1, 'Normal'), 1: (2, 'Suspect'), 2: (3, 'Pathological')}
-                class_id, class_label = mapping.get(predicted_class_idx, (1, 'Normal'))
-        else:
-            # Default mapping if no label mapping available
-            mapping = {0: (1, 'Normal'), 1: (2, 'Suspect'), 2: (3, 'Pathological')}
-            class_id, class_label = mapping.get(predicted_class_idx, (1, 'Normal'))
-        
-        print(f"Final prediction - Class ID: {class_id}, Class Label: {class_label}")
-        
-        return class_id, class_label
+        details = self.predict_details(data)
+        return details['class_id'], details['class_label']
     
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the loaded model"""

@@ -1,460 +1,129 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FetalCareXAI - AI-Powered Fetal Health Prediction</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Explainable AI support for educational fetal cardiotocography assessment.">
+  <meta name="theme-color" content="#0e1f1b">
+  <title>FetalCare XAI — Explainable fetal health assessment</title>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <h1>FetalCareXAI</h1>
-            <p>AI-powered fetal health classification with explainable predictions</p>
-            
-            <!-- Theme Toggle -->
-            <div class="theme-toggle">
-                <button id="themeToggle" class="theme-btn" title="Toggle Dark/Light Mode">
-                    <span class="theme-icon">🌙</span>
-                </button>
-            </div>
-        </header>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="#assessment" aria-label="FetalCare XAI home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48"><path d="M24 42C13 34 7 28 7 18a9 9 0 0 1 16-6 9 9 0 0 1 18 6c0 10-7 16-17 24Z"/><path d="M17 25h5l2-8 4 14 3-6h4"/></svg>
+      </span>
+      <span><strong>FetalCare</strong><small>Explainable AI</small></span>
+    </a>
+    <nav class="primary-nav" aria-label="Primary navigation">
+      <button class="nav-link active" data-view="assessment">Assessment</button>
+      <button class="nav-link" data-view="analytics">Session analytics</button>
+      <button class="nav-link" data-view="about">Model & safety</button>
+    </nav>
+    <button class="icon-button" id="themeToggle" type="button" aria-label="Switch to light theme" title="Switch to light theme">
+      <svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+    </button>
+  </header>
 
-        <!-- Tab Navigation -->
-        <nav class="tab-navigation">
-            <button class="tab-btn active" data-tab="prediction">Prediction</button>
-            <button class="tab-btn" data-tab="model-info">Model & Features</button>
-            <button class="tab-btn" data-tab="analytics">Analytics Dashboard</button>
-        </nav>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <!-- Prediction Tab -->
-            <div class="tab-content active" id="prediction-tab">
-                <!-- Input Form Section -->
-                <section class="card">
-                    <h2>Input Features</h2>
-                    <p class="section-description">Enter the fetal health monitoring parameters below:</p>
-                    
-                    <form id="predictionForm" class="form">
-                        <div id="formFields" class="form-fields">
-                            <!-- Dynamic form fields will be inserted here -->
-                        </div>
-                        
-                        <div class="form-actions">
-                            <button type="button" id="clearBtn" class="btn btn-secondary">Clear All</button>
-                            <button type="button" id="randomFillBtn" class="btn btn-secondary">Fill Random Values</button>
-                            <button type="button" id="testNormalBtn" class="btn btn-secondary">Test Normal</button>
-                            <button type="button" id="testSuspectBtn" class="btn btn-secondary">Test Suspect</button>
-                            <button type="button" id="testPathologicalBtn" class="btn btn-secondary">Test Pathological</button>
-                            <button type="button" id="previewBtn" class="btn btn-ghost">Preview</button>
-                            <button type="submit" id="predictBtn" class="btn btn-primary">Predict</button>
-                        </div>
-                    </form>
-                </section>
-
-                <!-- Preview Section -->
-                <section id="previewSection" class="card hidden">
-                    <h2>Input Preview</h2>
-                    <div id="previewContent" class="preview-content">
-                        <!-- Preview content will be inserted here -->
-                    </div>
-                </section>
-
-                <!-- Results Section -->
-                <section id="resultsSection" class="card hidden">
-                    <h2>Prediction Results</h2>
-                    <div class="results-content">
-                        <div id="predictionResult" class="prediction-result">
-                            <!-- Prediction result will be inserted here -->
-                        </div>
-                        
-                        <div class="result-actions">
-                            <button id="explainBtn" class="btn btn-primary">Generate Explanation</button>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Explanation Section -->
-                <section id="explanationSection" class="card hidden">
-                    <h2>AI Explanation (LIME)</h2>
-                    <p class="section-description">Understanding why the model made this prediction:</p>
-                    <div id="explanationContent" class="explanation-content">
-                        <!-- Explanation content will be inserted here -->
-                    </div>
-                </section>
-            </div>
-
-            <!-- Model Info Tab -->
-            <div class="tab-content" id="model-info-tab">
-                <!-- Model Details Section -->
-                <section class="card">
-                    <h2>🤖 Model Information</h2>
-                    <div class="model-info-grid">
-                        <div class="info-card">
-                            <h3>Model Type</h3>
-                            <p>LightGBM Classifier</p>
-                            <span class="info-badge">Gradient Boosting</span>
-                        </div>
-                        <div class="info-card">
-                            <h3>Target Classes</h3>
-                            <div class="class-badges">
-                                <span class="class-badge normal">Normal</span>
-                                <span class="class-badge suspect">Suspect</span>
-                                <span class="class-badge pathological">Pathological</span>
-                            </div>
-                        </div>
-                        <div class="info-card">
-                            <h3>Feature Count</h3>
-                            <p id="featureCount">19 Features</p>
-                            <span class="info-badge">Cardiotocographic Data</span>
-                        </div>
-                        <div class="info-card">
-                            <h3>Model Status</h3>
-                            <p id="modelStatus">✅ Loaded & Ready</p>
-                            <span class="info-badge success">Operational</span>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Features Details Section -->
-                <section class="card">
-                    <h2>📊 Feature Details</h2>
-                    <p class="section-description">Comprehensive information about all input features used by the model:</p>
-                    <div id="featuresDetails" class="features-details">
-                        <!-- Features details will be populated here -->
-                    </div>
-                </section>
-
-                <!-- Model Performance Section -->
-                <section class="card">
-                    <h2>📈 Model Performance</h2>
-                    <div class="performance-grid">
-                        <div class="performance-card">
-                            <h3>Accuracy</h3>
-                            <div class="performance-value">96%</div>
-                            <p>Overall classification accuracy on validation data</p>
-                        </div>
-                        <div class="performance-card">
-                            <h3>Explainability</h3>
-                            <div class="performance-value">LIME</div>
-                            <p>Local Interpretable Model-agnostic Explanations</p>
-                        </div>
-                        <div class="performance-card">
-                            <h3>Response Time</h3>
-                            <div class="performance-value">~200ms</div>
-                            <p>Average prediction processing time</p>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-            <!-- Analytics Dashboard Tab -->
-            <div class="tab-content" id="analytics-tab">
-                <!-- Analytics Overview -->
-                <section class="card">
-                    <h2>📊 Analytics Overview</h2>
-                    <div class="analytics-stats-grid">
-                        <div class="analytics-stat-card">
-                            <div class="stat-icon">🎯</div>
-                            <div class="stat-value" id="totalPredictions">0</div>
-                            <div class="stat-label">Total Predictions</div>
-                        </div>
-                        <div class="analytics-stat-card">
-                            <div class="stat-icon">✅</div>
-                            <div class="stat-value" id="normalCount">0</div>
-                            <div class="stat-label">Normal Cases</div>
-                        </div>
-                        <div class="analytics-stat-card">
-                            <div class="stat-icon">⚠️</div>
-                            <div class="stat-value" id="suspectCount">0</div>
-                            <div class="stat-label">Suspect Cases</div>
-                        </div>
-                        <div class="analytics-stat-card">
-                            <div class="stat-icon">🚨</div>
-                            <div class="stat-value" id="pathologicalCount">0</div>
-                            <div class="stat-label">Pathological Cases</div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Charts Row 1 -->
-                <div class="charts-row">
-                    <!-- Prediction Distribution -->
-                    <section class="card chart-card">
-                        <h2>📈 Prediction Distribution</h2>
-                        <div class="chart-container">
-                            <canvas id="distributionChart" width="400" height="250"></canvas>
-                        </div>
-                    </section>
-
-                    <!-- Confidence Score Trends -->
-                    <section class="card chart-card">
-                        <h2>📊 Confidence Trends</h2>
-                        <div class="chart-container">
-                            <canvas id="confidenceTrendChart" width="400" height="250"></canvas>
-                        </div>
-                    </section>
-                </div>
-
-                <!-- Charts Row 2 -->
-                <div class="charts-row">
-                    <!-- Feature Importance Heatmap -->
-                    <section class="card chart-card heatmap-card">
-                        <h2>🔥 Feature Importance Heatmap</h2>
-                        <div class="chart-controls">
-                            <select id="heatmapTimeRange">
-                                <option value="session">Current Session</option>
-                                <option value="day">Last 24 Hours</option>
-                                <option value="week">Last Week</option>
-                            </select>
-                        </div>
-                        <div class="heatmap-container">
-                            <canvas id="featureHeatmap" width="600" height="400"></canvas>
-                        </div>
-                        <div class="heatmap-legend">
-                            <span class="legend-item">
-                                <div class="legend-color low"></div>
-                                <span>Low Impact</span>
-                            </span>
-                            <span class="legend-item">
-                                <div class="legend-color medium"></div>
-                                <span>Medium Impact</span>
-                            </span>
-                            <span class="legend-item">
-                                <div class="legend-color high"></div>
-                                <span>High Impact</span>
-                            </span>
-                        </div>
-                    </section>
-
-                    <!-- Time Series Analysis -->
-                    <section class="card chart-card">
-                        <h2>⏰ Hourly Activity</h2>
-                        <div class="chart-container">
-                            <canvas id="timeSeriesChart" width="400" height="250"></canvas>
-                        </div>
-                    </section>
-                </div>
-
-                <!-- Charts Row 3 -->
-                <div class="charts-row">
-                    <!-- Risk Distribution Radar -->
-                    <section class="card chart-card">
-                        <h2>🎯 Risk Assessment Radar</h2>
-                        <div class="chart-container">
-                            <canvas id="riskRadarChart" width="400" height="300"></canvas>
-                        </div>
-                    </section>
-
-                    <!-- Feature Correlation Matrix -->
-                    <section class="card chart-card">
-                        <h2>🔗 Feature Correlations</h2>
-                        <div class="chart-container">
-                            <canvas id="correlationMatrix" width="400" height="300"></canvas>
-                        </div>
-                    </section>
-                </div>
-
-                <!-- Usage Patterns -->
-                <section class="card">
-                    <h2>📅 Usage Patterns & Statistics</h2>
-                    <div class="usage-grid">
-                        <div class="usage-card">
-                            <h3>Average Session Time</h3>
-                            <div class="usage-value" id="avgSessionTime">2.5 min</div>
-                        </div>
-                        <div class="usage-card">
-                            <h3>Most Active Hour</h3>
-                            <div class="usage-value" id="mostActiveHour">14:00</div>
-                        </div>
-                        <div class="usage-card">
-                            <h3>Feature Usage</h3>
-                            <div class="usage-value" id="featureUsage">Explanations: 85%</div>
-                        </div>
-                        <div class="usage-card">
-                            <h3>Average Confidence</h3>
-                            <div class="usage-value" id="avgConfidence">92%</div>
-                        </div>
-                        <div class="usage-card">
-                            <h3>Peak Prediction Time</h3>
-                            <div class="usage-value" id="peakTime">2:30 PM</div>
-                        </div>
-                        <div class="usage-card">
-                            <h3>Model Accuracy</h3>
-                            <div class="usage-value" id="modelAccuracy">94.2%</div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Performance Metrics -->
-                <section class="card">
-                    <h2>⚡ Performance Metrics</h2>
-                    <div class="performance-metrics">
-                        <div class="metric-row">
-                            <span class="metric-label">Average Response Time</span>
-                            <div class="metric-bar">
-                                <div class="metric-fill" style="width: 15%"></div>
-                            </div>
-                            <span class="metric-value">180ms</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">System Uptime</span>
-                            <div class="metric-bar">
-                                <div class="metric-fill" style="width: 99%"></div>
-                            </div>
-                            <span class="metric-value">99.8%</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Explanation Generation</span>
-                            <div class="metric-bar">
-                                <div class="metric-fill" style="width: 25%"></div>
-                            </div>
-                            <span class="metric-value">2.1s</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Cache Hit Rate</span>
-                            <div class="metric-bar">
-                                <div class="metric-fill" style="width: 85%"></div>
-                            </div>
-                            <span class="metric-value">85.3%</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="metric-label">Memory Usage</span>
-                            <div class="metric-bar">
-                                <div class="metric-fill" style="width: 45%"></div>
-                            </div>
-                            <span class="metric-value">45.2%</span>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Data Quality Insights -->
-                <section class="card">
-                    <h2>🔍 Data Quality Insights</h2>
-                    <div class="data-quality-grid">
-                        <div class="quality-card">
-                            <h3>Data Completeness</h3>
-                            <div class="quality-meter">
-                                <div class="quality-fill" style="width: 98%"></div>
-                            </div>
-                            <span class="quality-value">98.5%</span>
-                        </div>
-                        <div class="quality-card">
-                            <h3>Outlier Detection</h3>
-                            <div class="quality-meter">
-                                <div class="quality-fill outlier" style="width: 12%"></div>
-                            </div>
-                            <span class="quality-value">2.1%</span>
-                        </div>
-                        <div class="quality-card">
-                            <h3>Range Validation</h3>
-                            <div class="quality-meter">
-                                <div class="quality-fill" style="width: 96%"></div>
-                            </div>
-                            <span class="quality-value">96.8%</span>
-                        </div>
-                    </div>
-                </section>
-            </div>
-        </main>
-
-        <!-- Quick Action Floating Buttons -->
-        <div class="quick-actions">
-            <div class="quick-action-btn" id="quickPredict" title="Quick Prediction">
-                <span>🎯</span>
-            </div>
-            <div class="quick-action-btn" id="exportPDF" title="Export PDF Report">
-                <span>📄</span>
-            </div>
-            <div class="quick-action-btn" id="clearAll" title="Clear All Data">
-                <span>🧹</span>
-            </div>
-            <div class="quick-action-btn" id="helpGuide" title="Help & Guide">
-                <span>❓</span>
-            </div>
+  <main id="main">
+    <section class="view active" id="assessment-view">
+      <div class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow">Clinical decision-support research</span>
+          <h1>Understand the signal.<br><em>Explain the prediction.</em></h1>
+          <p>Review 19 cardiotocography measurements with an interpretable LightGBM model designed for transparent, educational assessment.</p>
+          <div class="hero-actions">
+            <button class="button primary" id="startAssessment" type="button">Start assessment</button>
+            <button class="button text" data-view-link="about" type="button">How the model works <span>→</span></button>
+          </div>
         </div>
-
-        <!-- Loading Overlay -->
-        <div id="loadingOverlay" class="loading-overlay hidden">
-            <div class="loading-spinner">
-                <div class="spinner"></div>
-                <p>Processing...</p>
-            </div>
+        <div class="hero-aside" aria-label="Illustrative cardiotocography signal">
+          <div class="signal-card">
+            <div class="signal-head"><span><i></i>Signal overview</span><small>Illustrative only</small></div>
+            <svg class="signal-wave" viewBox="0 0 500 150" preserveAspectRatio="none" aria-hidden="true"><path class="grid-line" d="M0 30H500M0 75H500M0 120H500M100 0V150M200 0V150M300 0V150M400 0V150"/><path class="wave-shadow" d="M0 84C25 80 35 83 55 82S82 80 98 84 113 89 126 81 144 69 157 82 177 88 195 81 212 80 230 82 247 85 262 79 278 65 290 80 311 90 330 82 349 79 365 83 380 86 394 80 410 66 424 80 443 88 462 82 480 80 500 82"/><path class="wave-main" d="M0 84C25 80 35 83 55 82S82 80 98 84 113 89 126 81 144 69 157 82 177 88 195 81 212 80 230 82 247 85 262 79 278 65 290 80 311 90 330 82 349 79 365 83 380 86 394 80 410 66 424 80 443 88 462 82 480 80 500 82"/></svg>
+            <div class="signal-stats"><div><span>19</span><small>CTG features</small></div><div><span>3</span><small>pattern classes</small></div><div><span>LIME</span><small>local explanation</small></div></div>
+          </div>
+          <aside class="safety-note"><span class="safety-icon" aria-hidden="true">i</span><div><strong>Research use only</strong><p>This tool does not provide a diagnosis or replace review by a qualified clinician.</p></div></aside>
         </div>
+      </div>
 
-        <!-- Error Modal -->
-        <div id="errorModal" class="modal hidden">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Error</h3>
-                    <button class="modal-close">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p id="errorMessage"></p>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary modal-close">Close</button>
-                </div>
+      <div class="workspace" id="assessmentWorkspace">
+        <div class="journey" aria-label="Assessment stages"><div class="active"><span>1</span><strong>Measurements</strong><small>Enter CTG values</small></div><i></i><div><span>2</span><strong>Classification</strong><small>Review probabilities</small></div><i></i><div><span>3</span><strong>Explanation</strong><small>Explore influences</small></div></div>
+        <section class="panel form-panel">
+          <div class="panel-heading">
+            <div><span class="step">01</span><h2>CTG measurements</h2><p>Enter values from a cardiotocography record. All fields are required.</p></div>
+            <div class="completion"><strong id="completionCount">0/19</strong><span>completed</span></div>
+          </div>
+          <div class="demo-tools" aria-label="Demo measurement presets">
+            <div><strong>Explore with sample data</strong><span>Choose a known model outcome or generate a varied example.</span></div>
+            <div class="preset-buttons">
+              <button class="preset normal" data-preset="normal" type="button"><i></i>Normal</button>
+              <button class="preset suspect" data-preset="suspect" type="button"><i></i>Suspect</button>
+              <button class="preset pathological" data-preset="pathological" type="button"><i></i>Pathological</button>
+              <button class="preset random" data-preset="random" type="button">↻ Random</button>
             </div>
-        </div>
-        
-        <!-- Website Footer -->
-        <footer class="website-footer">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <div class="footer-logo">
-                        <h3>FetalCareXAI</h3>
-                        <p>Advanced AI for Fetal Health Monitoring</p>
-                    </div>
-                </div>
-                
-                <div class="footer-section">
-                    <h4>Technology</h4>
-                    <ul>
-                        <li>LightGBM Classifier</li>
-                        <li>LIME Explanations</li>
-                        <li>Real-time Analytics</li>
-                        <li>Responsive Design</li>
-                    </ul>
-                </div>
-                
-                <div class="footer-section">
-                    <h4>Features</h4>
-                    <ul>
-                        <li>19 CTG Parameters</li>
-                        <li>Explainable AI</li>
-                        <li>PDF Export</li>
-                        <li>Dark/Light Mode</li>
-                    </ul>
-                </div>
-                
-                <div class="footer-section">
-                    <h4>About</h4>
-                    <ul>
-                        <li>Clinical Decision Support</li>
-                        <li>Research-Based</li>
-                        <li>Open Source</li>
-                        <li>Privacy-First</li>
-                    </ul>
-                </div>
+            <div class="data-tools"><label class="button subtle" for="csvInput">Import CSV<input id="csvInput" type="file" accept=".csv,text/csv" hidden></label><button class="button text" id="downloadTemplate" type="button">Download CSV template</button></div>
+            <small>Demo outputs illustrate model behavior only. They are not example patients or clinical guidance.</small>
+          </div>
+          <form id="predictionForm" novalidate>
+            <div id="formAlert" class="form-alert hidden" role="alert"></div>
+            <div id="formFields" class="field-groups" aria-live="polite"></div>
+            <div class="form-footer">
+              <p><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>Measurements stay in this browser tab and are not saved.</p>
+              <div><button class="button subtle" id="clearBtn" type="button">Clear</button><button class="button primary" id="predictBtn" type="submit">Run assessment <span>→</span></button></div>
             </div>
-            
-            <div class="footer-bottom">
-                <div class="footer-info">
-                    <p>&copy; 2025 FetalCareXAI. All rights reserved.</p>
-                    <p class="disclaimer">This system provides AI-assisted analysis for educational and research purposes. Always consult healthcare professionals for medical decisions.</p>
-                </div>
-                <div class="footer-links">
-                    <span class="version">v1.0.0</span>
-                    <span class="separator">|</span>
-                    <span class="build-date">Built on September 3, 2025</span>
-                </div>
-            </div>
-        </footer>
-    </div>
+          </form>
+        </section>
 
-    <script src="app.js"></script>
+        <section class="panel result-panel" id="resultPanel" aria-live="polite">
+          <div class="result-empty" id="resultEmpty">
+            <span class="result-orbit" aria-hidden="true"><i></i></span>
+            <span class="step">02</span><h2>Your result will appear here</h2><p>Complete the CTG measurements to view the classification, confidence distribution, and an explainable-AI breakdown.</p>
+          </div>
+          <div class="hidden" id="resultContent"></div>
+        </section>
+      </div>
+      <section class="how-it-works" aria-labelledby="workflowTitle">
+        <div><span class="eyebrow">A transparent workflow</span><h2 id="workflowTitle">From measurements to an explainable result</h2></div>
+        <ol><li><span>1</span><div><strong>Validate</strong><p>Every value is checked against the model’s accepted input domain.</p></div></li><li><span>2</span><div><strong>Classify</strong><p>LightGBM estimates probability across three fetal-health pattern classes.</p></div></li><li><span>3</span><div><strong>Explain</strong><p>LIME highlights the measurements that locally influenced this specific output.</p></div></li></ol>
+      </section>
+    </section>
+
+    <section class="view page-view" id="analytics-view">
+      <div class="page-heading"><span class="eyebrow">Privacy-safe insights</span><h1>Session analytics</h1><p>Aggregated activity from this browser tab only. No measurements or results are stored after you close it.</p></div>
+      <div class="metric-grid">
+        <article class="metric-card"><span>Assessments</span><strong id="metricAssessments">0</strong><small>this session</small></article>
+        <article class="metric-card"><span>Explanations</span><strong id="metricExplanations">0</strong><small>generated on request</small></article>
+        <article class="metric-card"><span>Average confidence</span><strong id="metricConfidence">—</strong><small>model probability</small></article>
+        <article class="metric-card"><span>Average response</span><strong id="metricResponse">—</strong><small>prediction API</small></article>
+      </div>
+      <section class="panel analytics-panel"><div class="panel-heading"><div><h2>Classification mix</h2><p>Counts are aggregated in memory and are not a patient record.</p></div><button class="button subtle" id="resetAnalytics" type="button">Reset session</button></div><div id="classMix" class="class-mix"></div></section>
+      <details class="panel privacy-details"><summary><span>Privacy boundary</span><strong>What is—and is not—counted</strong></summary><div><p>Only four temporary numbers are tracked: assessment count, explanation count, average confidence, and average response time. Raw CTG values and individual results are not retained.</p><p>All session metrics disappear when this tab is closed or refreshed.</p></div></details>
+    </section>
+
+    <section class="view page-view" id="about-view">
+      <div class="page-heading"><span class="eyebrow">Responsible AI</span><h1>Model, method & limitations</h1><p>A transparent overview of what the system evaluates and how its output should be interpreted.</p></div>
+      <section class="model-identity panel" id="modelIdentity"><div class="model-identity-main"><span class="live-badge"><i></i>Loaded model</span><h2>Loading model card…</h2><p>Reading versioned metadata from the prediction service.</p></div></section>
+      <section class="evaluation-section"><div class="section-intro"><span class="eyebrow">Verified evaluation</span><h2>Evaluation dashboard</h2><p>Performance is reported on the reconstructed 423-row held-out test set that exactly matches the serialized model metadata.</p></div><div id="evaluationMetrics" class="evaluation-metrics"></div><div id="datasetProfile"></div><div id="diagnosticDashboard"></div></section>
+      <div class="about-grid">
+        <article class="panel"><span class="step">01</span><h2>LightGBM classification</h2><p>The trained model evaluates 19 numerical CTG features and returns probabilities for Normal, Suspect, and Pathological classes.</p></article>
+        <article class="panel"><span class="step">02</span><h2>LIME explanations</h2><p>LIME approximates the model near one assessment to highlight which measurements most influenced that particular result.</p></article>
+        <article class="panel warning-panel"><span class="step">!</span><h2>Not a medical device</h2><p>Outputs may be incorrect or incomplete. They must not be used for diagnosis, treatment, triage, or emergency decisions.</p></article>
+      </div>
+      <section class="panel class-explorer"><div class="panel-heading"><div><h2>Explore model classes</h2><p>Select a class to understand how this application presents it.</p></div></div><div class="class-tabs" role="tablist"><button class="class-tab active" data-class="Normal" type="button">Normal</button><button class="class-tab" data-class="Suspect" type="button">Suspect</button><button class="class-tab" data-class="Pathological" type="button">Pathological</button></div><div id="classExplanation" class="class-explanation" aria-live="polite"></div></section>
+      <section class="safety-grid"><details class="panel" open><summary>Appropriate use</summary><p>Education, software demonstration, model-behavior exploration, and research prototyping with non-identifying data.</p></details><details class="panel"><summary>Inappropriate use</summary><p>Diagnosis, emergency triage, treatment selection, patient monitoring, or replacing review by a qualified healthcare professional.</p></details><details class="panel"><summary>Known limitations</summary><p>Training-domain shift, measurement error, class imbalance, imperfect probability calibration, and locally approximate LIME explanations can all affect output.</p></details></section>
+      <section class="panel feature-reference"><div class="panel-heading"><div><h2>Measurement reference</h2><p>Ranges reflect the model’s accepted training-domain inputs, not clinical reference intervals.</p></div><label class="reference-search"><span>Search measurements</span><input id="featureSearch" type="search" placeholder="e.g. variability"></label></div><div id="featureReference" class="reference-grid"></div></section>
+    </section>
+  </main>
+
+  <footer><span>FetalCare XAI</span><p>Educational and research software · Always consult a qualified healthcare professional.</p></footer>
+  <div class="loading hidden" id="loadingOverlay" role="status"><span></span><p id="loadingText">Analyzing measurements…</p></div>
+  <div class="toast hidden" id="toast" role="status"></div>
+  <dialog id="comparisonDialog" class="comparison-dialog"><div class="dialog-head"><div><span class="eyebrow">Transient comparison</span><h2>Assessment A vs B</h2></div><button class="icon-button" id="closeComparison" type="button" aria-label="Close comparison">×</button></div><div id="comparisonContent"></div><p class="dialog-privacy">Comparison exists only in this browser tab and is cleared on refresh.</p></dialog>
+  <section id="printReport" class="print-report" aria-hidden="true"></section>
+  <script src="/app.js" defer></script>
 </body>
 </html>
