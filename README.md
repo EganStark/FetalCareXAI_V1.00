@@ -1,164 +1,267 @@
+<div align="center">
+
 # FetalCare XAI
 
-An explainable machine-learning application for exploring fetal cardiotocography
-(CTG) patterns. FetalCare XAI combines a LightGBM classifier with LIME local
-explanations in a responsive, privacy-conscious Flask application.
+### Explainable fetal CTG pattern classification
 
+LightGBM predictions, transparent LIME explanations, and a privacy-conscious
+clinical research interface.
+
+[![Quality checks](https://github.com/EganStark/FetalCareXAI_V1.00/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/EganStark/FetalCareXAI_V1.00/actions/workflows/ci-cd.yml)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-2.3-123C36?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
+[![License: MIT](https://img.shields.io/badge/Code-MIT-BD8853)](LICENSE)
+[![Dataset: CC BY 4.0](https://img.shields.io/badge/Dataset-CC_BY_4.0-74B8A8)](https://creativecommons.org/licenses/by/4.0/)
+
+[Quick start](#quick-start) · [Evaluation](#verified-evaluation) · [API](#api-reference) · [Deployment](DEPLOYMENT.md) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+> [!IMPORTANT]
 > **Research and education only.** FetalCare XAI is not a medical device and
 > must not be used for diagnosis, triage, treatment, or patient monitoring.
 
-## Overview
+## Why FetalCare XAI
 
-The model evaluates 19 CTG measurements and estimates probabilities for three
-pattern classes:
+Cardiotocography produces measurements that can be difficult to interpret
+consistently. FetalCare XAI demonstrates how an interpretable machine-learning
+workflow can classify CTG feature patterns while showing users what influenced
+each individual result.
 
-- **Normal**
-- **Suspect**
-- **Pathological**
+| Predict | Explain | Explore responsibly |
+|---|---|---|
+| Probabilities across Normal, Suspect, and Pathological patterns | Plain-language LIME contributions and the original weight chart | No accounts, cloud history, or medical-input analytics |
 
-The interface presents the probability distribution, uncertainty guidance, a
-plain-language explanation, and the original LIME weight chart. Measurements
-and results remain transient in the browser tab; this release has no accounts,
-cloud history, or patient-record storage.
+## Product capabilities
 
-## Highlights
+<details open>
+<summary><strong>Assessment experience</strong></summary>
 
-- Modern dark-first interface with a fully responsive light theme
-- Range-aware validation for all 19 model features
+- Dark-first responsive interface with an accessible light theme
+- Range-aware validation for 19 ordered CTG measurements
 - Verified Normal, Suspect, Pathological, and randomized demo inputs
-- Real model probabilities rather than simulated confidence values
-- LIME contribution summaries and generated weight charts
-- Privacy-safe, in-memory session analytics
-- CSV template download and validated CSV import
-- Printable assessment reports with browser-based PDF export
-- Temporary side-by-side assessment comparison
-- Versioned model card, dataset provenance, and held-out evaluation dashboard
-- Security headers, request limits, production error handling, and Docker support
+- Real model probabilities with additional low-confidence guidance
+- Temporary side-by-side comparison of two assessments
+
+</details>
+
+<details>
+<summary><strong>Explainability and reporting</strong></summary>
+
+- Human-readable local feature influence
+- Backend-generated LIME weight chart
+- Printable report with browser-based PDF export
+- CSV template download and validated first-row import
+- Versioned model identity and artifact fingerprint
+
+</details>
+
+<details>
+<summary><strong>Privacy and production safeguards</strong></summary>
+
+- Session analytics aggregate counts in memory only
+- Raw CTG inputs are not saved as history or sent to analytics
+- Request-size limits, security headers, safe public errors, and restricted CORS
+- Docker, Gunicorn, health checks, and Render blueprint
+- Automated Python and JavaScript checks on GitHub Actions
+
+</details>
+
+## How it works
+
+```mermaid
+flowchart LR
+    A[19 CTG measurements] --> B[Schema and range validation]
+    B --> C[Stored StandardScaler]
+    C --> D[LightGBM classifier]
+    D --> E[Three-class probabilities]
+    E --> F[Result and uncertainty guidance]
+    D --> G[LIME local approximation]
+    G --> H[Readable contributions and weight chart]
+```
+
+The application keeps prediction and explanation behavior aligned by using the
+same ordered feature artifact and stored scaler throughout the pipeline.
 
 ## Verified evaluation
 
-The serialized production model was evaluated on a reconstructed, stratified
-20% test split. The reconstruction uses duplicate removal and `random_state=42`;
-its accuracy and macro F1 match the stored model metadata exactly.
+The production artifact was evaluated on a reconstructed stratified test split.
+The reconstruction removes duplicate rows, uses an 80/20 split with
+`random_state=42`, and reproduces the stored accuracy and macro F1 exactly.
 
-| Metric | Value |
+| Measure | Held-out result |
 |---|---:|
 | Test records | 423 |
-| Accuracy | 96.69% |
-| Macro F1 | 94.27% |
-| Weighted F1 | 96.55% |
-| ROC AUC, one-vs-rest | 98.99% |
+| Accuracy | **96.69%** |
+| Macro F1 | **94.27%** |
+| Weighted F1 | **96.55%** |
+| ROC AUC, one-vs-rest | **98.99%** |
 
-The Suspect class is the most difficult class, with held-out recall of 79.31%.
-See the in-application model card for the confusion matrix, per-class measures,
-calibration diagnostics, and limitations.
+<details>
+<summary><strong>Held-out confusion matrix and class measures</strong></summary>
 
-## Dataset
+| Actual \ Predicted | Normal | Suspect | Pathological |
+|---|---:|---:|---:|
+| Normal | 329 | 1 | 0 |
+| Suspect | 11 | 46 | 1 |
+| Pathological | 1 | 0 | 34 |
 
-The project uses the Cardiotocography dataset: 2,126 CTG records, 21 measured
-predictors, no missing values, and fetal-state consensus labels assigned by
-three expert obstetricians. The deployed model uses 19 of those predictors.
+| Class | Precision | Recall | F1 | Support |
+|---|---:|---:|---:|---:|
+| Normal | 96.48% | 99.70% | 98.06% | 330 |
+| Suspect | 97.87% | 79.31% | 87.62% | 58 |
+| Pathological | 97.14% | 97.14% | 97.14% | 35 |
 
-**Citation:** Campos, D. & Bernardes, J. (2000). *Cardiotocography* [Dataset].
-UCI Machine Learning Repository. <https://doi.org/10.24432/C51S4N>
+The Suspect class has the lowest recall. This limitation matters more than the
+overall accuracy and is presented explicitly in the application model card.
 
-- [Authoritative UCI repository](https://archive.ics.uci.edu/dataset/193/cardiotocography)
+</details>
+
+See [EVALUATION_ARTIFACTS.md](EVALUATION_ARTIFACTS.md) for model lineage,
+fingerprints, calibration evidence, and unresolved historical discrepancies.
+
+## Dataset provenance
+
+The project uses the **Cardiotocography** dataset: 2,126 fetal CTG records, 21
+measured predictors, no missing values, and consensus labels assigned by three
+expert obstetricians. The deployed model uses 19 predictors.
+
+> Campos, D. & Bernardes, J. (2000). *Cardiotocography* [Dataset]. UCI Machine
+> Learning Repository. <https://doi.org/10.24432/C51S4N>
+
+- [UCI Machine Learning Repository](https://archive.ics.uci.edu/dataset/193/cardiotocography)
 - [Kaggle mirror](https://www.kaggle.com/datasets/andrewmvd/fetal-health-classification)
-- License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Dataset license: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 ## Technology
 
-| Layer | Technologies |
+| Area | Stack |
 |---|---|
-| Application | Python 3.12, Flask, Gunicorn |
-| Model | LightGBM, scikit-learn, Joblib |
+| Web service | Python 3.12, Flask, Gunicorn |
+| Machine learning | LightGBM, scikit-learn, Joblib |
 | Explainability | LIME, Matplotlib |
 | Interface | Semantic HTML, modern CSS, vanilla JavaScript |
-| Quality | pytest, GitHub Actions, Docker |
+| Delivery | pytest, GitHub Actions, Docker, Render blueprint |
 
-## Local development
+## Quick start
 
-### Requirements
+### 1. Create the environment
 
-- Python 3.12
-- `uv` or `pip`
+<details open>
+<summary><strong>Windows with uv</strong></summary>
 
-### Setup with `uv`
+```powershell
+uv python install 3.12.11
+uv venv --python 3.12.11 .venv
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary><strong>macOS or Linux with uv</strong></summary>
 
 ```bash
 uv python install 3.12.11
 uv venv --python 3.12.11 .venv
-uv pip install --python .venv/Scripts/python.exe -r requirements.txt
+uv pip install --python .venv/bin/python -r requirements.txt
 ```
 
-On macOS or Linux, replace `.venv/Scripts/python.exe` with
-`.venv/bin/python`.
+</details>
 
-### Run
+### 2. Start the application
 
 ```bash
 python start_app.py
 ```
 
-Open <http://127.0.0.1:5000>. The health endpoint is available at
+Open <http://127.0.0.1:5000>. Confirm service health at
 <http://127.0.0.1:5000/health>.
 
-### Test
+### 3. Run verification
 
 ```bash
 python -m pytest -q
+node --check backend/static/app.js
 ```
 
-## API
+## API reference
 
 | Method | Endpoint | Purpose |
 |---|---|---|
 | `GET` | `/health` | Service and model health |
-| `GET` | `/schema` | Feature definitions and accepted ranges |
-| `GET` | `/model-card` | Versioned provenance and evaluation evidence |
-| `POST` | `/preview` | Validate a measurement payload |
-| `POST` | `/predict` | Return class probabilities and classification |
+| `GET` | `/schema` | Ordered features and accepted ranges |
+| `GET` | `/model-card` | Provenance and evaluation evidence |
+| `POST` | `/preview` | Validate measurements without inference |
+| `POST` | `/predict` | Return classification and probabilities |
 | `POST` | `/explain` | Generate a local LIME explanation |
 
-Prediction and explanation requests accept a JSON object containing exactly the
-19 features returned by `/schema`.
+<details>
+<summary><strong>Example prediction request</strong></summary>
 
-## Project structure
+The complete payload must contain the exact 19 fields returned by `/schema`.
+
+```bash
+curl --request POST http://127.0.0.1:5000/predict \
+  --header "Content-Type: application/json" \
+  --data @measurement.json
+```
+
+Example response:
+
+```json
+{
+  "status": "success",
+  "class_id": 1,
+  "class_label": "Normal",
+  "confidence": 0.999939,
+  "probabilities": {
+    "Normal": 0.999939,
+    "Suspect": 0.000053,
+    "Pathological": 0.000008
+  }
+}
+```
+
+</details>
+
+## Repository map
 
 ```text
 backend/
-  app.py                   Flask routes and production safeguards
-  model/                   Serialized model, metadata, and evaluation summary
-  services/                Validation, prediction, and explanation services
-  static/                  Application interface
-tests/                     Maintained pytest suite
-DEPLOYMENT.md              Hosting and production checklist
-EVALUATION_ARTIFACTS.md    Evaluation lineage and artifact requirements
-Dockerfile                 Reproducible production container
-render.yaml                Render service blueprint
+├── app.py                   API routes and production safeguards
+├── model/                   Model artifacts and evaluation evidence
+├── services/                Validation, prediction, and LIME services
+└── static/                  Responsive application interface
+tests/                       Maintained pytest suite
+DEPLOYMENT.md                Production deployment runbook
+EVALUATION_ARTIFACTS.md      Evaluation and lineage record
+Dockerfile                   Reproducible container image
+render.yaml                  Render infrastructure blueprint
 ```
 
-## Deployment
+## Documentation
 
-The recommended first production target is a Docker-based Render web service.
-The native LightGBM runtime and LIME/Matplotlib dependencies are a better fit for
-a container than a Vercel serverless function. See [DEPLOYMENT.md](DEPLOYMENT.md).
+| Guide | Purpose |
+|---|---|
+| [Deployment runbook](DEPLOYMENT.md) | Build, configure, verify, and release |
+| [Evaluation record](EVALUATION_ARTIFACTS.md) | Dataset, split, metrics, and lineage |
+| [Contributing](CONTRIBUTING.md) | Engineering and model-change standards |
+| [License](LICENSE) | MIT terms for application source |
 
-## Privacy and responsible use
+## Responsible use
 
-- Do not submit identifiable patient information.
-- Raw CTG measurements are not sent to analytics or stored as history.
-- Session analytics are aggregated in memory and disappear on refresh.
-- LIME explains local model behavior; it does not establish clinical causality.
-- External clinical validation and applicable regulatory review are required
-  before any clinical use.
+> [!WARNING]
+> LIME describes local model behavior; it does not establish causality or
+> clinical validity. External clinical validation and applicable regulatory
+> review are required before any clinical use.
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development, testing, and model-change
-requirements.
+- Never submit or commit identifiable patient information.
+- Do not treat model confidence as clinical certainty.
+- Do not use this project for emergency or treatment decisions.
+- Preserve dataset attribution when redistributing derived work.
 
 ## License
 
 Application source code is available under the [MIT License](LICENSE). Dataset
-use remains subject to the dataset's CC BY 4.0 terms and attribution requirements.
+use remains subject to CC BY 4.0 attribution requirements.
