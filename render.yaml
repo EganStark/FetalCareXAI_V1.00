@@ -2,7 +2,7 @@ services:
   - type: web
     name: fetalcare-xai
     runtime: docker
-    plan: starter
+    plan: free
     healthCheckPath: /health
     autoDeploy: false
     envVars:
