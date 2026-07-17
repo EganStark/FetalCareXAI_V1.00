@@ -1,1657 +1,269 @@
-/**
- * Fetal Health Prediction App
- * Frontend JavaScript for handling user interactions and API communication
- */
-
-class FetalHealthApp {
-    constructor() {
-        this.baseURL = window.location.origin;
-        this.schema = null;
-        this.currentPrediction = null;
-        this.currentInputData = null;
-        this.analyticsData = {
-            totalPredictions: 0,
-            normalCount: 0,
-            suspectCount: 0,
-            pathologicalCount: 0,
-            sessionStartTime: Date.now()
-        };
-        
-        this.init();
-    }
-
-    async init() {
-        try {
-            await this.loadSchema();
-            this.setupEventListeners();
-            this.loadCachedInputs();
-            this.generateForm();
-            this.initializeTheme();
-            this.loadAnalyticsData();
-        } catch (error) {
-            this.showError('Failed to initialize application: ' + error.message);
-        }
-    }
-
-    async loadSchema() {
-        try {
-            const response = await fetch(`${this.baseURL}/schema`);
-            if (!response.ok) throw new Error('Failed to load schema');
-            this.schema = await response.json();
-        } catch (error) {
-            throw new Error('Unable to connect to the prediction service');
-        }
-    }
-
-    setupEventListeners() {
-        // Tab navigation
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
-        });
-
-        // Theme toggle
-        document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
-
-        // Quick action buttons
-        document.getElementById('quickPredict').addEventListener('click', () => this.quickPredict());
-        document.getElementById('exportPDF').addEventListener('click', () => this.exportPDF());
-        document.getElementById('clearAll').addEventListener('click', () => this.clearAllData());
-        document.getElementById('helpGuide').addEventListener('click', () => this.showHelpGuide());
-
-        // Form buttons
-        document.getElementById('clearBtn').addEventListener('click', () => this.clearForm());
-        document.getElementById('randomFillBtn').addEventListener('click', () => this.fillRandomValues());
-        document.getElementById('testNormalBtn').addEventListener('click', () => this.fillTestValues('normal'));
-        document.getElementById('testSuspectBtn').addEventListener('click', () => this.fillTestValues('suspect'));
-        document.getElementById('testPathologicalBtn').addEventListener('click', () => this.fillTestValues('pathological'));
-        document.getElementById('previewBtn').addEventListener('click', () => this.previewInput());
-        document.getElementById('predictBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.makePrediction();
-        });
-        document.getElementById('explainBtn').addEventListener('click', () => this.generateExplanation());
-
-        // Modal close buttons
-        document.querySelectorAll('.modal-close').forEach(btn => {
-            btn.addEventListener('click', () => this.hideModal());
-        });
-
-        // Click outside modal to close
-        document.getElementById('errorModal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) this.hideModal();
-        });
-
-        // Form input changes - save to localStorage
-        document.addEventListener('input', (e) => {
-            if (e.target.matches('input[type="number"]')) {
-                this.saveInputToCache();
-            }
-        });
-
-        // Heatmap time range selector
-        const heatmapSelector = document.getElementById('heatmapTimeRange');
-        if (heatmapSelector) {
-            heatmapSelector.addEventListener('change', () => this.updateFeatureHeatmap());
-        }
-    }
-
-    generateForm() {
-        const formFields = document.getElementById('formFields');
-        formFields.innerHTML = '';
-
-        if (!this.schema || !this.schema.features) {
-            formFields.innerHTML = '<p>Unable to load form schema</p>';
-            return;
-        }
-
-        Object.entries(this.schema.features).forEach(([fieldName, fieldMeta]) => {
-            const formGroup = document.createElement('div');
-            formGroup.className = 'form-group';
-
-            const label = document.createElement('label');
-            label.setAttribute('for', fieldName);
-            label.textContent = this.formatFieldName(fieldName);
-
-            const description = document.createElement('div');
-            description.className = 'field-description';
-            description.textContent = fieldMeta.description || '';
-
-            const rangeInfo = document.createElement('div');
-            rangeInfo.className = 'field-range';
-            rangeInfo.textContent = `Range: ${fieldMeta.min} - ${fieldMeta.max}`;
-
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.id = fieldName;
-            input.name = fieldName;
-            input.min = fieldMeta.min;
-            input.max = fieldMeta.max;
-            input.step = fieldMeta.type === 'float' ? 'any' : '1';
-            input.required = true;
-            input.placeholder = `Enter value (${fieldMeta.min} - ${fieldMeta.max})`;
-
-            formGroup.appendChild(label);
-            formGroup.appendChild(description);
-            formGroup.appendChild(input);
-            formGroup.appendChild(rangeInfo);
-
-            formFields.appendChild(formGroup);
-        });
-    }
-
-    formatFieldName(fieldName) {
-        return fieldName
-            .split('_')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-    }
-
-    getFormData() {
-        const formData = {};
-        const inputs = document.querySelectorAll('#formFields input');
-        
-        inputs.forEach(input => {
-            const value = input.value.trim();
-            if (value !== '') {
-                formData[input.name] = parseFloat(value);
-            }
-        });
-
-        return formData;
-    }
-
-    validateFormData(data) {
-        const errors = [];
-        const requiredFields = this.schema.required || Object.keys(this.schema.features);
-
-        // Check for missing fields
-        requiredFields.forEach(field => {
-            if (!(field in data) || data[field] === '' || isNaN(data[field])) {
-                errors.push(`${this.formatFieldName(field)} is required`);
-            }
-        });
-
-        // Validate ranges
-        Object.entries(data).forEach(([field, value]) => {
-            if (this.schema.features[field]) {
-                const meta = this.schema.features[field];
-                if (value < meta.min || value > meta.max) {
-                    errors.push(`${this.formatFieldName(field)} must be between ${meta.min} and ${meta.max}`);
-                }
-            }
-        });
-
-        return errors;
-    }
-
-    async previewInput() {
-        const formData = this.getFormData();
-        const validationErrors = this.validateFormData(formData);
-
-        if (validationErrors.length > 0) {
-            this.showError('Please fix the following errors:\n• ' + validationErrors.join('\n• '));
-            return;
-        }
-
-        this.showLoading();
-
-        try {
-            const response = await fetch(`${this.baseURL}/preview`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Preview failed');
-            }
-
-            this.displayPreview(result.data);
-            this.showSection('previewSection');
-
-        } catch (error) {
-            this.showError('Preview failed: ' + error.message);
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    displayPreview(data) {
-        const previewContent = document.getElementById('previewContent');
-        
-        // Calculate statistics
-        const stats = this.calculatePreviewStats(data);
-        
-        // Create the enhanced preview HTML
-        previewContent.innerHTML = `
-            <!-- Preview Summary -->
-            <div class="preview-summary">
-                <h3>📊 Input Summary</h3>
-                <div class="preview-summary-stats">
-                    <div class="preview-stat">
-                        <div class="preview-stat-value">${stats.total}</div>
-                        <div class="preview-stat-label">Total Fields</div>
-                    </div>
-                    <div class="preview-stat">
-                        <div class="preview-stat-value">${stats.average.toFixed(1)}</div>
-                        <div class="preview-stat-label">Average Value</div>
-                    </div>
-                    <div class="preview-stat">
-                        <div class="preview-stat-value">${stats.min.toFixed(1)}</div>
-                        <div class="preview-stat-label">Min Value</div>
-                    </div>
-                    <div class="preview-stat">
-                        <div class="preview-stat-value">${stats.max.toFixed(1)}</div>
-                        <div class="preview-stat-label">Max Value</div>
-                    </div>
-                </div>
-                <div class="preview-validation-status">
-                    ✅ All ${stats.total} fields validated successfully
-                </div>
-            </div>
-            
-            <!-- Categorized Features -->
-            <div class="preview-categories">
-                ${this.generateCategorizedPreview(data)}
-            </div>
-        `;
-    }
-
-    calculatePreviewStats(data) {
-        const values = Object.values(data);
-        return {
-            total: values.length,
-            average: values.reduce((a, b) => a + b, 0) / values.length,
-            min: Math.min(...values),
-            max: Math.max(...values)
-        };
-    }
-
-    generateCategorizedPreview(data) {
-        // Categorize features based on their medical purpose
-        const categories = {
-            'Heart Rate Patterns': {
-                icon: '💓',
-                fields: ['baseline_value', 'accelerations', 'fetal_movement', 'uterine_contractions']
-            },
-            'Variability Metrics': {
-                icon: '📈',
-                fields: ['abnormal_short_term_variability', 'mean_value_of_short_term_variability', 
-                        'percentage_of_time_with_abnormal_long_term_variability', 'mean_value_of_long_term_variability']
-            },
-            'Deceleration Analysis': {
-                icon: '📉',
-                fields: ['light_decelerations', 'severe_decelerations', 'prolonged_decelerations']
-            },
-            'Advanced Metrics': {
-                icon: '🔬',
-                fields: ['histogram_width', 'histogram_min', 'histogram_max', 'histogram_number_of_peaks',
-                        'histogram_number_of_zeroes', 'histogram_mode', 'histogram_mean', 'histogram_median',
-                        'histogram_variance', 'histogram_tendency']
-            }
-        };
-
-        return Object.entries(categories).map(([categoryName, category]) => {
-            const categoryFields = category.fields.filter(field => data.hasOwnProperty(field));
-            
-            if (categoryFields.length === 0) return '';
-            
-            const fieldsHTML = categoryFields.map(field => {
-                const value = data[field];
-                const fieldMeta = this.schema.features[field] || {};
-                const unit = this.getFieldUnit(field);
-                
-                return `
-                    <div class="preview-item">
-                        <span class="label">${this.formatFieldName(field)}</span>
-                        <span class="value">
-                            ${value}
-                            ${unit ? `<span class="unit">${unit}</span>` : ''}
-                        </span>
-                    </div>
-                `;
-            }).join('');
-
-            return `
-                <div class="preview-category">
-                    <div class="preview-category-header">
-                        <div class="preview-category-title">
-                            <span>${category.icon}</span>
-                            ${categoryName}
-                        </div>
-                        <span class="preview-category-count">${categoryFields.length} fields</span>
-                    </div>
-                    <div class="preview-items-grid">
-                        ${fieldsHTML}
-                    </div>
-                </div>
-            `;
-        }).filter(html => html !== '').join('');
-    }
-
-    getFieldUnit(fieldName) {
-        // Return appropriate units for different field types
-        const units = {
-            'baseline_value': 'bpm',
-            'accelerations': 'per sec',
-            'fetal_movement': 'per sec',
-            'uterine_contractions': 'per sec',
-            'light_decelerations': 'per sec',
-            'severe_decelerations': 'per sec',
-            'prolonged_decelerations': 'per sec',
-            'abnormal_short_term_variability': '%',
-            'mean_value_of_short_term_variability': 'ms',
-            'percentage_of_time_with_abnormal_long_term_variability': '%',
-            'mean_value_of_long_term_variability': 'ms',
-            'histogram_width': 'bpm',
-            'histogram_min': 'bpm',
-            'histogram_max': 'bpm',
-            'histogram_mode': 'bpm',
-            'histogram_mean': 'bpm',
-            'histogram_median': 'bpm',
-            'histogram_variance': 'bpm²'
-        };
-        return units[fieldName] || '';
-    }
-
-    async makePrediction() {
-        const formData = this.getFormData();
-        const validationErrors = this.validateFormData(formData);
-
-        if (validationErrors.length > 0) {
-            this.showError('Please fix the following errors:\n• ' + validationErrors.join('\n• '));
-            return;
-        }
-
-        // Cache current inputs
-        this.cacheCurrentInputs();
-
-        this.showLoading();
-
-        try {
-            const response = await fetch(`${this.baseURL}/predict`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Prediction failed');
-            }
-
-            this.currentPrediction = result;
-            this.currentInputData = formData;
-            this.displayPrediction(result);
-            this.updateAnalytics(result);
-            this.showSection('resultsSection');
-
-        } catch (error) {
-            this.showError('Prediction failed: ' + error.message);
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    displayPrediction(result) {
-        const predictionResult = document.getElementById('predictionResult');
-        
-        // Calculate confidence and prepare detailed information
-        const confidence = this.calculateConfidence(result);
-        const details = this.getPredictionDetails(result.class_label);
-        const recommendations = this.getPredictionRecommendations(result.class_label);
-        
-        predictionResult.innerHTML = `
-            <div class="prediction-header">
-                <h3>🎯 Prediction Result</h3>
-                <p class="prediction-subtext">AI-powered fetal health classification based on cardiotocographic analysis</p>
-            </div>
-            
-            <div class="prediction-badge prediction-${result.class_label.toLowerCase()}">
-                ${result.class_label}
-            </div>
-            
-            <div class="confidence-meter">
-                <div class="confidence-label">Model Confidence</div>
-                <div class="confidence-bar">
-                    <div class="confidence-fill" style="width: ${confidence}%"></div>
-                </div>
-                <div class="confidence-percentage">${confidence}%</div>
-            </div>
-            
-            <div class="prediction-details">
-                ${details.map(detail => `
-                    <div class="prediction-detail-card">
-                        <span class="prediction-detail-icon">${detail.icon}</span>
-                        <div class="prediction-detail-label">${detail.label}</div>
-                        <div class="prediction-detail-value">${detail.value}</div>
-                        <div class="prediction-detail-description">${detail.description}</div>
-                    </div>
-                `).join('')}
-            </div>
-            
-            <div class="prediction-recommendations">
-                <h4>📋 Clinical Recommendations</h4>
-                <ul class="recommendations-list">
-                    ${recommendations.map(rec => `
-                        <li>
-                            <span class="recommendation-icon">${rec.icon}</span>
-                            <span class="recommendation-text">${rec.text}</span>
-                        </li>
-                    `).join('')}
-                </ul>
-            </div>
-        `;
-        
-        // Animate confidence bar
-        setTimeout(() => {
-            const fillElement = predictionResult.querySelector('.confidence-fill');
-            if (fillElement) {
-                fillElement.style.width = `${confidence}%`;
-            }
-        }, 100);
-    }
-
-    calculateConfidence(result) {
-        // Simulate confidence calculation based on prediction class
-        // In a real scenario, this would come from the model's probability scores
-        const baseConfidence = {
-            'normal': 94,
-            'suspect': 87,
-            'pathological': 91
-        };
-        
-        const variance = Math.random() * 6 - 3; // ±3% variance
-        return Math.max(75, Math.min(99, Math.round(baseConfidence[result.class_label.toLowerCase()] + variance)));
-    }
-
-    getPredictionDetails(label) {
-        const commonDetails = [
-            {
-                icon: '🤖',
-                label: 'Model Used',
-                value: 'LightGBM',
-                description: 'Gradient boosting classifier'
-            },
-            {
-                icon: '⚡',
-                label: 'Processing Time',
-                value: '< 200ms',
-                description: 'Real-time analysis'
-            },
-            {
-                icon: '📊',
-                label: 'Features Analyzed',
-                value: '19',
-                description: 'Cardiotocographic parameters'
-            }
-        ];
-
-        const specificDetails = {
-            'normal': {
-                icon: '✅',
-                label: 'Risk Level',
-                value: 'Low',
-                description: 'Normal fetal health indicators'
-            },
-            'suspect': {
-                icon: '⚠️',
-                label: 'Risk Level',
-                value: 'Medium',
-                description: 'Requires monitoring'
-            },
-            'pathological': {
-                icon: '🚨',
-                label: 'Risk Level',
-                value: 'High',
-                description: 'Immediate attention needed'
-            }
-        };
-
-        return [...commonDetails, specificDetails[label.toLowerCase()]];
-    }
-
-    getPredictionRecommendations(label) {
-        const recommendations = {
-            'normal': [
-                {
-                    icon: '✅',
-                    text: 'Continue routine prenatal monitoring as scheduled'
-                },
-                {
-                    icon: '📅',
-                    text: 'Regular follow-up appointments are sufficient'
-                },
-                {
-                    icon: '💡',
-                    text: 'Maintain healthy lifestyle and prenatal care routine'
-                },
-                {
-                    icon: '📞',
-                    text: 'Contact healthcare provider if any concerns arise'
-                }
-            ],
-            'suspect': [
-                {
-                    icon: '👁️',
-                    text: 'Increased monitoring frequency recommended'
-                },
-                {
-                    icon: '🔄',
-                    text: 'Consider repeat CTG testing in shorter intervals'
-                },
-                {
-                    icon: '👨‍⚕️',
-                    text: 'Discuss findings with maternal-fetal medicine specialist'
-                },
-                {
-                    icon: '📊',
-                    text: 'Additional diagnostic tests may be warranted'
-                }
-            ],
-            'pathological': [
-                {
-                    icon: '🚨',
-                    text: 'Immediate medical evaluation required'
-                },
-                {
-                    icon: '🏥',
-                    text: 'Consider hospital admission for continuous monitoring'
-                },
-                {
-                    icon: '⚕️',
-                    text: 'Urgent consultation with obstetric team'
-                },
-                {
-                    icon: '🎯',
-                    text: 'Prepare for potential delivery if indicated'
-                }
-            ]
-        };
-
-        return recommendations[label.toLowerCase()] || [];
-    }
-
-    getPredictionDescription(label) {
-        switch (label.toLowerCase()) {
-            case 'normal':
-                return 'The fetal health indicators suggest normal conditions.';
-            case 'suspect':
-                return 'The fetal health indicators suggest potentially concerning conditions that may require monitoring.';
-            case 'pathological':
-                return 'The fetal health indicators suggest abnormal conditions that may require immediate medical attention.';
-            default:
-                return 'Prediction completed.';
-        }
-    }
-
-    async generateExplanation() {
-        if (!this.currentInputData) {
-            this.showError('No prediction data available for explanation');
-            return;
-        }
-
-        this.showLoading();
-
-        try {
-            const response = await fetch(`${this.baseURL}/explain`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(this.currentInputData)
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.error || 'Explanation failed');
-            }
-
-            this.displayExplanation(result);
-            this.showSection('explanationSection');
-
-        } catch (error) {
-            this.showError('Explanation failed: ' + error.message);
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    displayExplanation(result) {
-        const explanationContent = document.getElementById('explanationContent');
-        explanationContent.innerHTML = '';
-
-        // Summary
-        const summary = document.createElement('div');
-        summary.className = 'explanation-summary';
-        summary.innerHTML = `
-            <h3>Prediction: ${result.class_label}</h3>
-            <p>The following features had the most influence on this prediction:</p>
-        `;
-        explanationContent.appendChild(summary);
-
-        // Feature explanations
-        if (result.explanations && result.explanations.length > 0) {
-            const featuresContainer = document.createElement('div');
-            featuresContainer.className = 'explanation-features';
-
-            result.explanations.forEach(explanation => {
-                const featureDiv = document.createElement('div');
-                featureDiv.className = 'feature-explanation';
-
-                const featureInfo = document.createElement('div');
-                featureInfo.className = 'feature-info';
-
-                const featureName = document.createElement('div');
-                featureName.className = 'feature-name';
-                featureName.textContent = this.formatFieldName(explanation.feature);
-
-                const featureValue = document.createElement('div');
-                featureValue.className = 'feature-value';
-                featureValue.textContent = `Value: ${explanation.value}`;
-
-                featureInfo.appendChild(featureName);
-                featureInfo.appendChild(featureValue);
-
-                const featureImpact = document.createElement('div');
-                featureImpact.className = 'feature-impact';
-
-                const impactBadge = document.createElement('span');
-                impactBadge.className = `impact-badge impact-${explanation.impact.toLowerCase()}`;
-                impactBadge.textContent = explanation.impact;
-
-                const impactWeight = document.createElement('span');
-                impactWeight.className = 'impact-weight';
-                impactWeight.textContent = `${explanation.weight > 0 ? '+' : ''}${explanation.weight}`;
-
-                featureImpact.appendChild(impactBadge);
-                featureImpact.appendChild(impactWeight);
-
-                featureDiv.appendChild(featureInfo);
-                featureDiv.appendChild(featureImpact);
-
-                featuresContainer.appendChild(featureDiv);
-            });
-
-            explanationContent.appendChild(featuresContainer);
-        } else {
-            const noExplanation = document.createElement('p');
-            noExplanation.textContent = 'No detailed explanations available.';
-            noExplanation.style.color = 'var(--text-secondary)';
-            explanationContent.appendChild(noExplanation);
-        }
-
-        // HTML visualization if available
-        if (result.html) {
-            const htmlContainer = document.createElement('div');
-            htmlContainer.className = 'lime-html-visualization';
-            htmlContainer.innerHTML = result.html;
-            explanationContent.appendChild(htmlContainer);
-        }
-
-        // Add graph visualization if available
-        if (result.graph_url) {
-            const graphContainer = document.createElement('div');
-            graphContainer.className = 'explanation-graph';
-            
-            const graphTitle = document.createElement('h4');
-            graphTitle.textContent = 'Visual Explanation';
-            graphContainer.appendChild(graphTitle);
-            
-            const graphImg = document.createElement('img');
-            graphImg.src = result.graph_url;
-            graphImg.alt = 'LIME Explanation Graph';
-            graphImg.className = 'explanation-chart';
-            graphImg.style.maxWidth = '100%';
-            graphImg.style.height = 'auto';
-            graphImg.style.border = '1px solid var(--border-color)';
-            graphImg.style.borderRadius = '8px';
-            graphImg.style.marginTop = '10px';
-            graphContainer.appendChild(graphImg);
-            
-            const graphCaption = document.createElement('p');
-            graphCaption.className = 'graph-caption';
-            graphCaption.style.fontSize = '0.9em';
-            graphCaption.style.color = 'var(--text-secondary)';
-            graphCaption.style.marginTop = '8px';
-            graphCaption.style.fontStyle = 'italic';
-            graphCaption.innerHTML = 'Interactive LIME explanation showing feature contributions. Positive values (green) support the prediction, negative values (red) oppose it.';
-            graphContainer.appendChild(graphCaption);
-            
-            explanationContent.appendChild(graphContainer);
-        }
-    }
-
-    clearForm() {
-        document.getElementById('predictionForm').reset();
-        this.hideSection('previewSection');
-        this.hideSection('resultsSection');
-        this.hideSection('explanationSection');
-        this.currentPrediction = null;
-        this.currentInputData = null;
-        localStorage.removeItem('fetalHealthInputs');
-    }
-
-    fillTestValues(testType) {
-        // Predefined test cases that match the model's expected features
-        const testCases = {
-            normal: {
-                'prolongued_decelerations': 0.0,
-                'abnormal_short_term_variability': 20.0,
-                'percentage_of_time_with_abnormal_long_term_variability': 5.0,
-                'histogram_mean': 135.0,
-                'histogram_mode': 134.0,
-                'histogram_median': 135.0,
-                'accelerations': 0.003,
-                'histogram_variance': 45.0,
-                'baseline value': 125.0,
-                'mean_value_of_short_term_variability': 1.8,
-                'uterine_contractions': 0.003,
-                'histogram_min': 85.0,
-                'mean_value_of_long_term_variability': 12.0,
-                'light_decelerations': 0.001,
-                'histogram_width': 95.0,
-                'histogram_tendency': 0.1,
-                'severe_decelerations': 0.0,
-                'histogram_number_of_peaks': 3.0,
-                'fetal_movement': 0.08
-            },
-            suspect: {
-                'prolongued_decelerations': 0.001,
-                'abnormal_short_term_variability': 45.0,
-                'percentage_of_time_with_abnormal_long_term_variability': 25.0,
-                'histogram_mean': 145.0,
-                'histogram_mode': 144.0,
-                'histogram_median': 144.0,
-                'accelerations': 0.001,
-                'histogram_variance': 75.0,
-                'baseline value': 140.0,
-                'mean_value_of_short_term_variability': 1.2,
-                'uterine_contractions': 0.008,
-                'histogram_min': 70.0,
-                'mean_value_of_long_term_variability': 25.0,
-                'light_decelerations': 0.006,
-                'histogram_width': 120.0,
-                'histogram_tendency': 0.4,
-                'severe_decelerations': 0.0,
-                'histogram_number_of_peaks': 6.0,
-                'fetal_movement': 0.02
-            },
-            pathological: {
-                'prolongued_decelerations': 0.003,
-                'abnormal_short_term_variability': 75.0,
-                'percentage_of_time_with_abnormal_long_term_variability': 85.0,
-                'histogram_mean': 165.0,
-                'histogram_mode': 165.0,
-                'histogram_median': 164.0,
-                'accelerations': 0.0,
-                'histogram_variance': 120.0,
-                'baseline value': 155.0,
-                'mean_value_of_short_term_variability': 0.4,
-                'uterine_contractions': 0.012,
-                'histogram_min': 55.0,
-                'mean_value_of_long_term_variability': 45.0,
-                'light_decelerations': 0.012,
-                'histogram_width': 150.0,
-                'histogram_tendency': 0.8,
-                'severe_decelerations': 0.001,
-                'histogram_number_of_peaks': 12.0,
-                'fetal_movement': 0.005
-            }
-        };
-
-        const testCase = testCases[testType];
-        if (!testCase) {
-            this.showNotification('Invalid test case type', 'error');
-            return;
-        }
-
-        // Fill the form with test values
-        Object.keys(testCase).forEach(featureName => {
-            const input = document.getElementById(featureName);
-            if (input) {
-                input.value = testCase[featureName];
-            }
-        });
-
-        // Show success message
-        document.getElementById('errorMessage').innerHTML = `
-            <div style="color: #10b981; text-align: center;">
-                <h3>✅ Test Case Loaded Successfully!</h3>
-                <p>Test case for <strong>${testType.toUpperCase()}</strong> has been filled.</p>
-                <p>You can now test the prediction or modify values as needed.</p>
-            </div>
-        `;
-        document.querySelector('#errorModal .modal-header h3').textContent = 'Test Case Loaded';
-        this.showModal();
-    }
-
-    showSection(sectionId) {
-        document.getElementById(sectionId).classList.remove('hidden');
-        document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    hideSection(sectionId) {
-        document.getElementById(sectionId).classList.add('hidden');
-    }
-
-    showLoading() {
-        document.getElementById('loadingOverlay').classList.remove('hidden');
-    }
-
-    hideLoading() {
-        document.getElementById('loadingOverlay').classList.add('hidden');
-    }
-
-    showError(message) {
-        document.getElementById('errorMessage').textContent = message;
-        document.getElementById('errorModal').classList.remove('hidden');
-    }
-
-    hideModal() {
-        document.getElementById('errorModal').classList.add('hidden');
-    }
-
-    showModal() {
-        document.getElementById('errorModal').classList.remove('hidden');
-    }
-
-    saveInputToCache() {
-        const formData = this.getFormData();
-        try {
-            localStorage.setItem('fetalHealthInputs', JSON.stringify(formData));
-        } catch (error) {
-            console.warn('Could not save inputs to localStorage:', error);
-        }
-    }
-
-    loadCachedInputs() {
-        try {
-            const cached = localStorage.getItem('fetalHealthInputs');
-            if (cached) {
-                const data = JSON.parse(cached);
-                Object.entries(data).forEach(([field, value]) => {
-                    const input = document.getElementById(field);
-                    if (input) {
-                        input.value = value;
-                    }
-                });
-            }
-        } catch (error) {
-            console.warn('Could not load cached inputs:', error);
-        }
-    }
-
-    // Tab functionality
-    switchTab(tabName) {
-        // Update tab buttons
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-
-        // Update tab content
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById(`${tabName}-tab`).classList.add('active');
-
-        // If switching to model info tab, populate it
-        if (tabName === 'model-info') {
-            this.populateModelInfo();
-        }
-    }
-
-    populateModelInfo() {
-        this.populateFeaturesDetails();
-        this.updateModelStatus();
-    }
-
-    populateFeaturesDetails() {
-        const featuresContainer = document.getElementById('featuresDetails');
-        if (!this.schema || !this.schema.features) {
-            featuresContainer.innerHTML = '<p>Feature information not available</p>';
-            return;
-        }
-
-        const featuresHTML = Object.entries(this.schema.features).map(([fieldName, fieldMeta]) => {
-            const featureType = fieldMeta.type === 'float' ? 'Continuous' : 'Discrete';
-            return `
-                <div class="feature-detail-card">
-                    <div class="feature-detail-info">
-                        <h4>${this.formatFieldName(fieldName)}</h4>
-                        <p>${fieldMeta.description || 'No description available'}</p>
-                        <div class="feature-detail-range">Range: ${fieldMeta.min} - ${fieldMeta.max}</div>
-                    </div>
-                    <div class="feature-detail-meta">
-                        <span class="feature-type-badge">${featureType}</span>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        featuresContainer.innerHTML = featuresHTML;
-
-        // Update feature count
-        const featureCount = Object.keys(this.schema.features).length;
-        document.getElementById('featureCount').textContent = `${featureCount} Features`;
-    }
-
-    updateModelStatus() {
-        const statusElement = document.getElementById('modelStatus');
-        if (this.schema) {
-            statusElement.innerHTML = '✅ Loaded & Ready';
-        } else {
-            statusElement.innerHTML = '❌ Not Available';
-        }
-    }
-
-    // Theme Management
-    initializeTheme() {
-        const savedTheme = localStorage.getItem('fetalHealthTheme') || 'light';
-        this.setTheme(savedTheme);
-    }
-
-    toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        this.setTheme(newTheme);
-    }
-
-    setTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        const themeIcon = document.querySelector('.theme-icon');
-        themeIcon.textContent = theme === 'light' ? '🌙' : '☀️';
-        localStorage.setItem('fetalHealthTheme', theme);
-    }
-
-    // Quick Actions
-    quickPredict() {
-        // Fill with last used values or random values
-        const lastInputs = localStorage.getItem('fetalHealthInputs');
-        if (lastInputs) {
-            this.loadCachedInputs();
-            this.makePrediction();
-        } else {
-            this.fillRandomValues();
-            setTimeout(() => this.makePrediction(), 500);
-        }
-    }
-
-    exportPDF() {
-        if (!this.currentPrediction || !this.currentInputData) {
-            this.showError('No prediction data available to export. Please make a prediction first.');
-            return;
-        }
-
-        // Create PDF content
-        const pdfContent = this.generatePDFContent();
-        
-        // Use browser's print functionality to save as PDF
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(pdfContent);
-        printWindow.document.close();
-        printWindow.print();
-    }
-
-    generatePDFContent() {
-        const currentDate = new Date().toLocaleString();
-        const prediction = this.currentPrediction;
-        
-        return `
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>FetalCareXAI - Health Prediction Report</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
-                    .header { text-align: center; border-bottom: 2px solid #6366f1; padding-bottom: 20px; margin-bottom: 30px; }
-                    .brand { color: #6366f1; font-size: 1.2em; font-weight: bold; margin-bottom: 5px; }
-                    .prediction-result { background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
-                    .input-data { margin: 20px 0; }
-                    .feature-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #eee; }
-                    .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
-                    @media print { body { margin: 0; } }
-                </style>
-            </head>
-            <body>
-                <div class="header">
-                    <div class="brand">FetalCareXAI</div>
-                    <h1>AI Health Prediction Report</h1>
-                    <p>Advanced Cardiotocographic Analysis with Explainable AI</p>
-                    <p>Generated on: ${currentDate}</p>
-                </div>
-                
-                <div class="prediction-result">
-                    <h2>Prediction Result: ${prediction.class_label}</h2>
-                    <p><strong>Confidence:</strong> ${this.calculateConfidence(prediction)}%</p>
-                    <p><strong>Model:</strong> LightGBM Classifier</p>
-                    <p><strong>Features Analyzed:</strong> 19 Cardiotocographic Parameters</p>
-                </div>
-                
-                <div class="input-data">
-                    <h3>Input Parameters</h3>
-                    ${Object.entries(this.currentInputData).map(([key, value]) => 
-                        `<div class="feature-row">
-                            <span><strong>${this.formatFieldName(key)}:</strong></span>
-                            <span>${value}</span>
-                        </div>`
-                    ).join('')}
-                </div>
-                
-                <div class="footer">
-                    <p>This report is generated by FetalCareXAI and should be used in conjunction with clinical judgment.</p>
-                    <p>© 2025 FetalCareXAI - Advanced AI for Fetal Health Monitoring</p>
-                </div>
-            </body>
-            </html>
-        `;
-    }
-
-    clearAllData() {
-        if (confirm('Are you sure you want to clear all data? This will reset the form and analytics.')) {
-            this.clearForm();
-            localStorage.removeItem('fetalHealthInputs');
-            localStorage.removeItem('fetalHealthAnalytics');
-            this.analyticsData = {
-                totalPredictions: 0,
-                normalCount: 0,
-                suspectCount: 0,
-                pathologicalCount: 0,
-                sessionStartTime: Date.now()
-            };
-            this.updateAnalyticsDashboard();
-            this.hideSection('previewSection');
-            this.hideSection('resultsSection');
-            this.hideSection('explanationSection');
-        }
-    }
-
-    showHelpGuide() {
-        const helpContent = `
-            <div style="max-height: 400px; overflow-y: auto; line-height: 1.6;">
-                <h3>🎯 Quick Start Guide</h3>
-                <p><strong>1. Enter Data:</strong> Fill in the cardiotocographic parameters</p>
-                <p><strong>2. Preview:</strong> Review your inputs before prediction</p>
-                <p><strong>3. Predict:</strong> Get AI-powered health classification</p>
-                <p><strong>4. Explain:</strong> Generate LIME explanations for transparency</p>
-                
-                <h3>🚀 Quick Actions</h3>
-                <p><strong>🎯 Quick Predict:</strong> Fast prediction with recent data</p>
-                <p><strong>📄 Export PDF:</strong> Generate comprehensive reports</p>
-                <p><strong>🧹 Clear All:</strong> Reset all data and analytics</p>
-                <p><strong>🌙 Theme Toggle:</strong> Switch between light/dark modes</p>
-                
-                <h3>📊 Test Values</h3>
-                <p>Use the test buttons to explore different scenarios:</p>
-                <p>• <strong>Normal:</strong> Healthy fetal indicators</p>
-                <p>• <strong>Suspect:</strong> Concerning patterns requiring monitoring</p>
-                <p>• <strong>Pathological:</strong> Abnormal conditions needing attention</p>
-            </div>
-        `;
-        
-        document.getElementById('errorMessage').innerHTML = helpContent;
-        document.querySelector('#errorModal .modal-header h3').textContent = 'Help & Guide';
-        this.showModal();
-    }
-
-    // Analytics Management
-    loadAnalyticsData() {
-        try {
-            const saved = localStorage.getItem('fetalHealthAnalytics');
-            if (saved) {
-                this.analyticsData = { ...this.analyticsData, ...JSON.parse(saved) };
-            }
-        } catch (error) {
-            console.warn('Could not load analytics data:', error);
-        }
-        this.updateAnalyticsDashboard();
-    }
-
-    updateAnalytics(prediction) {
-        this.analyticsData.totalPredictions++;
-        
-        switch (prediction.class_label.toLowerCase()) {
-            case 'normal':
-                this.analyticsData.normalCount++;
-                break;
-            case 'suspect':
-                this.analyticsData.suspectCount++;
-                break;
-            case 'pathological':
-                this.analyticsData.pathologicalCount++;
-                break;
-        }
-        
-        this.saveAnalyticsData();
-        this.updateAnalyticsDashboard();
-    }
-
-    saveAnalyticsData() {
-        try {
-            localStorage.setItem('fetalHealthAnalytics', JSON.stringify(this.analyticsData));
-        } catch (error) {
-            console.warn('Could not save analytics data:', error);
-        }
-    }
-
-    updateAnalyticsDashboard() {
-        document.getElementById('totalPredictions').textContent = this.analyticsData.totalPredictions;
-        document.getElementById('normalCount').textContent = this.analyticsData.normalCount;
-        document.getElementById('suspectCount').textContent = this.analyticsData.suspectCount;
-        document.getElementById('pathologicalCount').textContent = this.analyticsData.pathologicalCount;
-        
-        // Update session time
-        const sessionTime = Math.round((Date.now() - this.analyticsData.sessionStartTime) / 60000);
-        document.getElementById('avgSessionTime').textContent = `${sessionTime} min`;
-        
-        // Update other metrics
-        const now = new Date();
-        document.getElementById('mostActiveHour').textContent = `${now.getHours()}:00`;
-        
-        const explanationUsage = this.analyticsData.totalPredictions > 0 ? 
-            Math.round((this.analyticsData.totalPredictions * 0.85)) : 0;
-        document.getElementById('featureUsage').textContent = `Explanations: ${explanationUsage}%`;
-        
-        document.getElementById('avgConfidence').textContent = '92%';
-        
-        // Update additional metrics
-        document.getElementById('peakTime').textContent = '2:30 PM';
-        document.getElementById('modelAccuracy').textContent = '94.2%';
-        
-        // Update all charts
-        this.updateDistributionChart();
-        this.updateConfidenceTrendChart();
-        this.updateFeatureHeatmap();
-        this.updateTimeSeriesChart();
-        this.updateRiskRadarChart();
-        this.updateCorrelationMatrix();
-    }
-
-    // Input Caching Methods
-    cacheCurrentInputs() {
-        try {
-            const formData = this.getFormData();
-            localStorage.setItem('fetalHealthInputs', JSON.stringify(formData));
-        } catch (error) {
-            console.warn('Could not cache inputs:', error);
-        }
-    }
-
-    loadCachedInputs() {
-        try {
-            const cached = localStorage.getItem('fetalHealthInputs');
-            if (cached) {
-                const data = JSON.parse(cached);
-                Object.entries(data).forEach(([key, value]) => {
-                    const element = document.getElementById(key);
-                    if (element) {
-                        element.value = value;
-                    }
-                });
-                this.updatePreview();
-            }
-        } catch (error) {
-            console.warn('Could not load cached inputs:', error);
-        }
-    }
-
-    fillRandomValues() {
-        if (!this.schema || !this.schema.features) {
-            this.showError('Schema not loaded yet. Please wait a moment and try again.');
-            return;
-        }
-
-        console.log('Filling random values with schema:', this.schema);
-
-        // Generate random values within the valid ranges for each feature
-        let filledCount = 0;
-        Object.keys(this.schema.features).forEach(featureName => {
-            const feature = this.schema.features[featureName];
-            const input = document.getElementById(featureName);
-            
-            if (input && feature.min !== undefined && feature.max !== undefined) {
-                let randomValue;
-                
-                if (feature.type === 'int') {
-                    randomValue = Math.floor(Math.random() * (feature.max - feature.min + 1)) + feature.min;
-                } else {
-                    // For float values, generate with 3 decimal places
-                    randomValue = (Math.random() * (feature.max - feature.min) + feature.min).toFixed(3);
-                    randomValue = parseFloat(randomValue);
-                }
-                
-                input.value = randomValue;
-                filledCount++;
-                console.log(`Filled ${featureName} with ${randomValue}`);
-            } else {
-                console.warn(`Could not fill ${featureName}:`, { input: !!input, feature });
-            }
-        });
-
-        console.log(`Filled ${filledCount} fields with random values`);
-        
-        // Trigger preview to update display
-        this.previewInput();
-        
-        // Show success message in the error modal (reusing existing modal)
-        document.getElementById('errorMessage').innerHTML = `
-            <div style="color: #10b981; text-align: center;">
-                <h3>✅ Random Values Filled Successfully!</h3>
-                <p>Filled ${filledCount} fields with random values.</p>
-                <p>You can now test the prediction or modify values as needed.</p>
-            </div>
-        `;
-        document.querySelector('#errorModal .modal-header h3').textContent = 'Success';
-        this.showModal();
-    }
-
-    updateDistributionChart() {
-        const canvas = document.getElementById('distributionChart');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        const data = this.analyticsData;
-        const total = data.totalPredictions || 1;
-        
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Enhanced bar chart with gradients
-        const barWidth = 80;
-        const spacing = 120;
-        const maxHeight = 180;
-        
-        const bars = [
-            { label: 'Normal', value: data.normalCount, color: ['#10b981', '#059669'], x: 50 },
-            { label: 'Suspect', value: data.suspectCount, color: ['#f59e0b', '#d97706'], x: 170 },
-            { label: 'Pathological', value: data.pathologicalCount, color: ['#ef4444', '#dc2626'], x: 290 }
-        ];
-        
-        bars.forEach(bar => {
-            const height = (bar.value / Math.max(total, 5)) * maxHeight;
-            
-            // Create gradient
-            const gradient = ctx.createLinearGradient(0, 250 - height, 0, 250);
-            gradient.addColorStop(0, bar.color[0]);
-            gradient.addColorStop(1, bar.color[1]);
-            
-            // Draw bar with shadow
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetY = 2;
-            
-            ctx.fillStyle = gradient;
-            ctx.fillRect(bar.x, 250 - height, barWidth, height);
-            
-            // Reset shadow
-            ctx.shadowColor = 'transparent';
-            
-            // Draw label
-            ctx.fillStyle = '#374151';
-            ctx.font = 'bold 12px Inter';
-            ctx.textAlign = 'center';
-            ctx.fillText(bar.label, bar.x + barWidth/2, 270);
-            
-            // Draw value
-            ctx.fillStyle = '#6366f1';
-            ctx.font = 'bold 14px Inter';
-            ctx.fillText(bar.value.toString(), bar.x + barWidth/2, 240 - height);
-        });
-    }
-
-    // New chart methods
-    updateConfidenceTrendChart() {
-        const canvas = document.getElementById('confidenceTrendChart');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Generate sample confidence trend data
-        const points = 12;
-        const data = [];
-        for (let i = 0; i < points; i++) {
-            data.push({
-                x: (canvas.width / (points - 1)) * i,
-                y: canvas.height - 50 - (Math.random() * 0.3 + 0.7) * (canvas.height - 100)
-            });
-        }
-        
-        // Draw grid
-        ctx.strokeStyle = '#e5e7eb';
-        ctx.lineWidth = 1;
-        for (let i = 0; i <= 10; i++) {
-            const y = (canvas.height / 10) * i;
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(canvas.width, y);
-            ctx.stroke();
-        }
-        
-        // Draw trend line
-        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-        gradient.addColorStop(0, '#6366f1');
-        gradient.addColorStop(1, '#8b5cf6');
-        
-        ctx.strokeStyle = gradient;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(data[0].x, data[0].y);
-        
-        for (let i = 1; i < data.length; i++) {
-            const cp1x = data[i-1].x + (data[i].x - data[i-1].x) / 3;
-            const cp1y = data[i-1].y;
-            const cp2x = data[i].x - (data[i].x - data[i-1].x) / 3;
-            const cp2y = data[i].y;
-            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, data[i].x, data[i].y);
-        }
-        ctx.stroke();
-        
-        // Draw points
-        data.forEach(point => {
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#6366f1';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-        });
-    }
-
-    updateFeatureHeatmap() {
-        const canvas = document.getElementById('featureHeatmap');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Feature importance heatmap
-        const features = [
-            'Baseline FHR', 'Accelerations', 'Fetal Movement', 'Uterine Contractions',
-            'Light Decelerations', 'Severe Decelerations', 'Prolonged Decelerations',
-            'Abnormal STV', 'Mean STV', 'Percentage Abnormal', 'Histogram Width',
-            'Histogram Min', 'Histogram Max', 'Histogram Peaks', 'Histogram Zeros',
-            'Histogram Mode', 'Histogram Mean', 'Histogram Median', 'Histogram Variance'
-        ];
-        
-        const cellWidth = canvas.width / 19;
-        const cellHeight = 25;
-        const startY = 50;
-        
-        // Draw feature labels
-        ctx.fillStyle = '#374151';
-        ctx.font = '10px Inter';
-        ctx.textAlign = 'left';
-        
-        features.forEach((feature, i) => {
-            const y = startY + i * cellHeight;
-            ctx.fillText(feature, 10, y + 15);
-            
-            // Generate heatmap cells for different prediction classes
-            ['Normal', 'Suspect', 'Pathological'].forEach((cls, j) => {
-                const x = 200 + j * cellWidth * 3;
-                const intensity = Math.random();
-                
-                // Color based on intensity
-                const colors = [
-                    [59, 130, 246], // Blue for low
-                    [245, 158, 11], // Orange for medium  
-                    [239, 68, 68]   // Red for high
-                ];
-                
-                let color;
-                if (intensity < 0.33) {
-                    color = colors[0];
-                } else if (intensity < 0.66) {
-                    color = colors[1];
-                } else {
-                    color = colors[2];
-                }
-                
-                const alpha = 0.3 + intensity * 0.7;
-                ctx.fillStyle = `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${alpha})`;
-                ctx.fillRect(x, y, cellWidth * 3, cellHeight - 2);
-            });
-        });
-        
-        // Draw class labels
-        ctx.fillStyle = '#374151';
-        ctx.font = 'bold 12px Inter';
-        ctx.textAlign = 'center';
-        ['Normal', 'Suspect', 'Pathological'].forEach((cls, i) => {
-            const x = 200 + i * cellWidth * 3 + (cellWidth * 3) / 2;
-            ctx.fillText(cls, x, 30);
-        });
-    }
-
-    updateTimeSeriesChart() {
-        const canvas = document.getElementById('timeSeriesChart');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // 24-hour activity chart
-        const hours = 24;
-        const barWidth = canvas.width / hours;
-        const maxHeight = canvas.height - 60;
-        
-        // Generate sample hourly data
-        const hourlyData = [];
-        for (let i = 0; i < hours; i++) {
-            // Peak hours around 10am and 2pm
-            let activity = Math.random() * 0.3;
-            if (i >= 9 && i <= 11) activity += 0.4;
-            if (i >= 13 && i <= 15) activity += 0.5;
-            if (i >= 20 || i <= 6) activity *= 0.5; // Lower at night
-            hourlyData.push(Math.min(activity, 1));
-        }
-        
-        // Draw bars
-        hourlyData.forEach((value, i) => {
-            const x = i * barWidth;
-            const height = value * maxHeight;
-            const y = canvas.height - 40 - height;
-            
-            // Gradient based on time of day
-            const gradient = ctx.createLinearGradient(0, y, 0, y + height);
-            if (i >= 6 && i <= 18) {
-                gradient.addColorStop(0, '#fbbf24');
-                gradient.addColorStop(1, '#f59e0b');
-            } else {
-                gradient.addColorStop(0, '#6366f1');
-                gradient.addColorStop(1, '#4f46e5');
-            }
-            
-            ctx.fillStyle = gradient;
-            ctx.fillRect(x + 2, y, barWidth - 4, height);
-            
-            // Draw hour label every 4 hours
-            if (i % 4 === 0) {
-                ctx.fillStyle = '#6b7280';
-                ctx.font = '10px Inter';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${i}:00`, x + barWidth/2, canvas.height - 20);
-            }
-        });
-    }
-
-    updateRiskRadarChart() {
-        const canvas = document.getElementById('riskRadarChart');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        const centerX = canvas.width / 2;
-        const centerY = canvas.height / 2;
-        const radius = Math.min(centerX, centerY) - 40;
-        
-        // Risk categories
-        const categories = [
-            'Baseline Abnormalities',
-            'Variability Issues', 
-            'Deceleration Patterns',
-            'Acceleration Deficiency',
-            'Uterine Activity',
-            'Fetal Movement'
-        ];
-        
-        // Sample risk scores (0-1)
-        const scores = [0.2, 0.7, 0.3, 0.1, 0.4, 0.6];
-        
-        // Draw background circles
-        ctx.strokeStyle = '#e5e7eb';
-        ctx.lineWidth = 1;
-        for (let i = 1; i <= 5; i++) {
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, (radius * i) / 5, 0, Math.PI * 2);
-            ctx.stroke();
-        }
-        
-        // Draw category lines
-        const angleStep = (Math.PI * 2) / categories.length;
-        ctx.strokeStyle = '#e5e7eb';
-        categories.forEach((category, i) => {
-            const angle = i * angleStep - Math.PI / 2;
-            const x = centerX + Math.cos(angle) * radius;
-            const y = centerY + Math.sin(angle) * radius;
-            
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.lineTo(x, y);
-            ctx.stroke();
-            
-            // Category labels
-            ctx.fillStyle = '#374151';
-            ctx.font = '11px Inter';
-            ctx.textAlign = 'center';
-            const labelX = centerX + Math.cos(angle) * (radius + 20);
-            const labelY = centerY + Math.sin(angle) * (radius + 20);
-            ctx.fillText(category, labelX, labelY);
-        });
-        
-        // Draw data polygon
-        ctx.beginPath();
-        ctx.strokeStyle = '#6366f1';
-        ctx.fillStyle = 'rgba(99, 102, 241, 0.2)';
-        ctx.lineWidth = 2;
-        
-        scores.forEach((score, i) => {
-            const angle = i * angleStep - Math.PI / 2;
-            const distance = score * radius;
-            const x = centerX + Math.cos(angle) * distance;
-            const y = centerY + Math.sin(angle) * distance;
-            
-            if (i === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
-        });
-        
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        
-        // Draw data points
-        scores.forEach((score, i) => {
-            const angle = i * angleStep - Math.PI / 2;
-            const distance = score * radius;
-            const x = centerX + Math.cos(angle) * distance;
-            const y = centerY + Math.sin(angle) * distance;
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#6366f1';
-            ctx.stroke();
-        });
-    }
-
-    updateCorrelationMatrix() {
-        const canvas = document.getElementById('correlationMatrix');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Top correlated features
-        const features = [
-            'Baseline FHR', 'STV Mean', 'Accelerations', 
-            'Decelerations', 'Variability', 'Histogram Mode'
-        ];
-        
-        const cellSize = 40;
-        const startX = 80;
-        const startY = 80;
-        
-        // Draw feature labels
-        ctx.fillStyle = '#374151';
-        ctx.font = '10px Inter';
-        ctx.textAlign = 'center';
-        
-        features.forEach((feature, i) => {
-            // Horizontal labels
-            ctx.save();
-            ctx.translate(startX + i * cellSize + cellSize/2, startY - 10);
-            ctx.rotate(-Math.PI / 4);
-            ctx.fillText(feature, 0, 0);
-            ctx.restore();
-            
-            // Vertical labels
-            ctx.textAlign = 'right';
-            ctx.fillText(feature, startX - 10, startY + i * cellSize + cellSize/2);
-        });
-        
-        // Draw correlation matrix
-        features.forEach((feature1, i) => {
-            features.forEach((feature2, j) => {
-                const x = startX + j * cellSize;
-                const y = startY + i * cellSize;
-                
-                // Generate correlation value (-1 to 1)
-                let correlation;
-                if (i === j) {
-                    correlation = 1; // Perfect correlation with self
-                } else {
-                    correlation = (Math.random() - 0.5) * 2;
-                }
-                
-                // Color based on correlation
-                const absCorr = Math.abs(correlation);
-                const alpha = absCorr;
-                
-                if (correlation > 0) {
-                    ctx.fillStyle = `rgba(59, 130, 246, ${alpha})`;
-                } else {
-                    ctx.fillStyle = `rgba(239, 68, 68, ${alpha})`;
-                }
-                
-                ctx.fillRect(x, y, cellSize - 1, cellSize - 1);
-                
-                // Draw correlation value
-                ctx.fillStyle = absCorr > 0.5 ? '#ffffff' : '#000000';
-                ctx.font = '8px Inter';
-                ctx.textAlign = 'center';
-                ctx.fillText(correlation.toFixed(2), x + cellSize/2, y + cellSize/2 + 3);
-            });
-        });
-    }
+const state = {
+  schema: null,
+  modelCard: null,
+  lastInput: null,
+  lastResult: null,
+  lastExplanation: null,
+  comparisonBase: null,
+  analytics: { assessments: 0, explanations: 0, confidenceTotal: 0, responseTotal: 0, classes: { Normal: 0, Suspect: 0, Pathological: 0 } }
+};
+
+const groups = [
+  { title: 'Heart rate & events', match: ['baseline value','accelerations','fetal_movement','uterine_contractions','light_decelerations','severe_decelerations','prolongued_decelerations'] },
+  { title: 'Variability', match: ['mean_value_of_short_term_variability','abnormal_short_term_variability','mean_value_of_long_term_variability','percentage_of_time_with_abnormal_long_term_variability'] },
+  { title: 'Histogram profile', match: ['histogram_width','histogram_min','histogram_number_of_peaks','histogram_mode','histogram_mean','histogram_median','histogram_variance','histogram_tendency'] }
+];
+
+const labels = {
+  'baseline value': 'Baseline fetal heart rate', accelerations: 'Accelerations', fetal_movement: 'Fetal movement',
+  uterine_contractions: 'Uterine contractions', light_decelerations: 'Light decelerations', severe_decelerations: 'Severe decelerations',
+  mean_value_of_short_term_variability: 'Mean short-term variability', mean_value_of_long_term_variability: 'Mean long-term variability',
+  prolongued_decelerations: 'Prolonged decelerations', abnormal_short_term_variability: 'Abnormal short-term variability',
+  percentage_of_time_with_abnormal_long_term_variability: 'Abnormal long-term variability time',
+  histogram_width: 'Histogram width', histogram_min: 'Histogram minimum', histogram_number_of_peaks: 'Histogram peaks', histogram_mode: 'Histogram mode', histogram_mean: 'Histogram mean',
+  histogram_median: 'Histogram median', histogram_variance: 'Histogram variance', histogram_tendency: 'Histogram tendency'
+};
+
+const presets = {
+  normal: {prolongued_decelerations:0,abnormal_short_term_variability:20,percentage_of_time_with_abnormal_long_term_variability:5,histogram_mean:135,histogram_mode:134,histogram_median:135,accelerations:.003,histogram_variance:45,'baseline value':125,mean_value_of_short_term_variability:1.8,uterine_contractions:.003,histogram_min:85,mean_value_of_long_term_variability:12,light_decelerations:.001,histogram_width:95,histogram_tendency:.1,severe_decelerations:0,histogram_number_of_peaks:3,fetal_movement:.08},
+  suspect: {prolongued_decelerations:.001,abnormal_short_term_variability:45,percentage_of_time_with_abnormal_long_term_variability:25,histogram_mean:145,histogram_mode:144,histogram_median:144,accelerations:.001,histogram_variance:75,'baseline value':140,mean_value_of_short_term_variability:1.2,uterine_contractions:.008,histogram_min:70,mean_value_of_long_term_variability:25,light_decelerations:.006,histogram_width:120,histogram_tendency:.4,severe_decelerations:0,histogram_number_of_peaks:6,fetal_movement:.02},
+  pathological: {prolongued_decelerations:.003,abnormal_short_term_variability:75,percentage_of_time_with_abnormal_long_term_variability:85,histogram_mean:165,histogram_mode:165,histogram_median:164,accelerations:0,histogram_variance:120,'baseline value':155,mean_value_of_short_term_variability:.4,uterine_contractions:.012,histogram_min:55,mean_value_of_long_term_variability:45,light_decelerations:.012,histogram_width:150,histogram_tendency:.8,severe_decelerations:.001,histogram_number_of_peaks:12,fetal_movement:.005}
+};
+
+const $ = (selector) => document.querySelector(selector);
+const escapeHTML = (value) => String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+const humanize = (name) => labels[name] || name.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+const percent = (value) => `${Math.round(Number(value) * 100)}%`;
+
+async function request(path, options = {}) {
+  const response = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'The service could not complete this request.');
+  return body;
 }
 
-// Initialize the application when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new FetalHealthApp();
-});
+function showView(name) {
+  document.querySelectorAll('.view').forEach(view => view.classList.toggle('active', view.id === `${name}-view`));
+  document.querySelectorAll('.nav-link').forEach(button => button.classList.toggle('active', button.dataset.view === name));
+  if (name === 'analytics') updateAnalytics();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function fieldHTML(name, meta) {
+  const step = meta.max <= 1 ? '0.001' : meta.type === 'int' ? '1' : '0.1';
+  return `<div class="field"><label for="${name}">${escapeHTML(humanize(name))}<span>${meta.min}–${meta.max}</span></label><input id="${name}" name="${name}" type="number" min="${meta.min}" max="${meta.max}" step="${step}" inputmode="decimal" required aria-describedby="${name}-help"><small id="${name}-help">${escapeHTML(meta.description || 'Model input measurement')}</small></div>`;
+}
+
+function renderSchema() {
+  const features = state.schema.features;
+  $('#formFields').innerHTML = groups.map(group => `<section class="field-group"><h3 class="group-title">${group.title}</h3><div class="fields">${group.match.filter(name => features[name]).map(name => fieldHTML(name, features[name])).join('')}</div></section>`).join('');
+  renderFeatureReference();
+}
+
+function renderFeatureReference(query = '') {
+  const term = query.trim().toLowerCase(); const features = state.schema.features;
+  const matches = state.schema.required.filter(name => `${humanize(name)} ${features[name].description}`.toLowerCase().includes(term));
+  $('#featureReference').innerHTML = matches.length ? matches.map(name => { const meta = features[name]; return `<div class="reference-item"><strong>${escapeHTML(humanize(name))}</strong><span>${escapeHTML(meta.description)}</span><small>Accepted: ${meta.min}–${meta.max}</small></div>`; }).join('') : '<p class="no-results">No measurements match that search.</p>';
+}
+
+function getInput() {
+  const data = {}; let valid = true;
+  state.schema.required.forEach(name => {
+    const input = document.getElementById(name); const value = Number(input.value);
+    const invalid = input.value === '' || !Number.isFinite(value) || value < Number(input.min) || value > Number(input.max);
+    input.classList.toggle('invalid', invalid); input.setAttribute('aria-invalid', String(invalid));
+    if (invalid) valid = false; else data[name] = value;
+  });
+  if (!valid) throw new Error('Complete every measurement using a value inside its accepted range.');
+  return data;
+}
+
+function showAlert(message) { const alert = $('#formAlert'); alert.textContent = message; alert.classList.remove('hidden'); alert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function setLoading(active, text = 'Analyzing measurements…') { $('#loadingText').textContent = text; $('#loadingOverlay').classList.toggle('hidden', !active); }
+function toast(message) { const el = $('#toast'); el.textContent = message; el.classList.remove('hidden'); setTimeout(() => el.classList.add('hidden'), 2600); }
+function setJourney(stage) { document.querySelectorAll('.journey>div').forEach((item,index) => { item.classList.toggle('active', index === stage); item.classList.toggle('complete', index < stage); }); }
+function updateCompletion() { const completed = state.schema.required.filter(name => document.getElementById(name)?.value !== '').length; $('#completionCount').textContent = `${completed}/${state.schema.required.length}`; }
+function loadPreset(type) {
+  let selected = type;
+  if (type === 'random') selected = ['normal', 'suspect', 'pathological'][Math.floor(Math.random() * 3)];
+  const source = presets[selected];
+  Object.entries(source).forEach(([name, base]) => {
+    const input = document.getElementById(name); if (!input) return;
+    let value = base;
+    if (type === 'random' && base !== 0) {
+      const variation = selected === 'suspect' ? .004 : .015;
+      value = base * (1 + (Math.random() * 2 - 1) * variation);
+      value = Math.min(Number(input.max), Math.max(Number(input.min), value));
+      value = Number(value.toFixed(Number(input.step) < .01 ? 4 : 2));
+    }
+    input.value = value; input.classList.remove('invalid');
+  });
+  $('#formAlert').classList.add('hidden'); updateCompletion();
+  toast(type === 'random' ? 'Randomized valid demo loaded — run it to discover the class' : `${selected[0].toUpperCase()+selected.slice(1)} demo loaded`);
+}
+
+function parseCSVLine(line) {
+  const values = []; let value = ''; let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === '"' && quoted && line[index + 1] === '"') { value += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === ',' && !quoted) { values.push(value.trim()); value = ''; }
+    else value += char;
+  }
+  values.push(value.trim()); return values;
+}
+function importCSV(file) {
+  if (!file || file.size > 64 * 1024) { showAlert('Choose a CSV file smaller than 64 KB.'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const lines = String(reader.result).replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim());
+      if (lines.length < 2) throw new Error('The CSV must contain a header row and at least one data row.');
+      const headers = parseCSVLine(lines[0]); const values = parseCSVLine(lines[1]);
+      const record = Object.fromEntries(headers.map((header,index) => [header.trim(), values[index]]));
+      const missing = state.schema.required.filter(name => !(name in record));
+      if (missing.length) throw new Error(`Missing columns: ${missing.map(humanize).join(', ')}`);
+      state.schema.required.forEach(name => { const value = Number(record[name]); if (!Number.isFinite(value)) throw new Error(`${humanize(name)} is not numeric.`); document.getElementById(name).value = value; });
+      getInput(); updateCompletion(); $('#formAlert').classList.add('hidden'); toast('First CSV data row imported and validated');
+    } catch (error) { showAlert(error.message); }
+  };
+  reader.onerror = () => showAlert('The CSV file could not be read.'); reader.readAsText(file);
+}
+function downloadCSVTemplate() {
+  const headers = state.schema.required.map(name => name.includes(' ') ? `"${name}"` : name).join(',');
+  const examples = state.schema.required.map(name => presets.normal[name]).join(',');
+  const url = URL.createObjectURL(new Blob([`${headers}\n${examples}\n`], { type: 'text/csv' }));
+  const link = document.createElement('a'); link.href = url; link.download = 'fetalcare-ctg-template.csv'; link.click(); URL.revokeObjectURL(url);
+}
+
+function renderResult(result) {
+  const status = result.class_label.toLowerCase();
+  const guidance = { Normal: 'The model found a pattern most consistent with its Normal class.', Suspect: 'The model found a pattern most consistent with its Suspect class. Clinical review is essential.', Pathological: 'The model found a pattern most consistent with its Pathological class. This is not an emergency alert; seek qualified clinical interpretation.' }[result.class_label];
+  const probabilities = Object.entries(result.probabilities).map(([label, value]) => `<div class="probability-row"><span>${label}</span><div class="probability-track"><div class="probability-fill" style="width:${percent(value)}"></div></div><strong>${percent(value)}</strong></div>`).join('');
+  const uncertainty = result.confidence < .70 ? `<div class="low-confidence"><strong>Closely divided model output</strong>The leading probability is below 70%, so the model shows greater uncertainty between classes. Interpret with additional caution.</div>` : '';
+  const compareLabel = state.comparisonBase ? 'Compare with saved A' : 'Save as comparison A';
+  $('#resultContent').innerHTML = `<span class="result-kicker">Model classification</span><div class="classification ${status}"><h3>${escapeHTML(result.class_label)}</h3><p>${escapeHTML(guidance)}</p></div>${uncertainty}<div class="interpretation"><div><strong>What this means</strong><span>The highest of three model probabilities determined this label.</span></div><div><strong>What this does not mean</strong><span>It is not a diagnosis, risk score, or instruction for treatment.</span></div></div><div class="confidence-head"><span>Probability distribution</span><strong>${percent(result.confidence)}</strong></div>${probabilities}<p class="result-disclaimer">The large percentage is confidence in the selected model class. It is not certainty or clinical accuracy for an individual case.</p><div class="result-buttons"><button class="button primary explain-button" id="explainBtn" type="button">Explain measurements</button><button class="button subtle" id="compareBtn" type="button">${compareLabel}</button><button class="button subtle" id="printBtn" type="button">Print / Save PDF</button></div><div id="explanation" class="explanation hidden"></div>`;
+  $('#resultEmpty').classList.add('hidden'); $('#resultContent').classList.remove('hidden');
+  $('#explainBtn').addEventListener('click', explainResult);
+  $('#printBtn').addEventListener('click', printAssessment);
+  $('#compareBtn').addEventListener('click', handleComparison);
+  setJourney(1);
+  $('#resultPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function runPrediction(event) {
+  event.preventDefault(); $('#formAlert').classList.add('hidden');
+  try {
+    const data = getInput(); setLoading(true); const started = performance.now();
+    const result = await request('/predict', { method: 'POST', body: JSON.stringify(data) });
+    const responseMs = performance.now() - started; state.lastInput = data; state.lastResult = result; state.lastExplanation = null;
+    const a = state.analytics; a.assessments += 1; a.confidenceTotal += result.confidence; a.responseTotal += responseMs; a.classes[result.class_label] += 1;
+    renderResult(result);
+  } catch (error) { showAlert(error.message); } finally { setLoading(false); }
+}
+
+async function explainResult() {
+  const button = $('#explainBtn'); button.disabled = true; setLoading(true, 'Generating local explanation…');
+  try {
+    const result = await request('/explain', { method: 'POST', body: JSON.stringify(state.lastInput) });
+    const max = Math.max(...result.explanations.map(item => Math.abs(item.weight)), 0.001);
+    const rows = result.explanations.slice(0, 8).map(item => { const width = Math.max(4, Math.abs(item.weight) / max * 100); return `<div class="impact-row"><div class="impact-head"><strong>${escapeHTML(item.feature)}</strong><span>${item.weight > 0 ? 'supports result' : 'opposes result'} · ${escapeHTML(item.value)}</span></div><div class="impact-track"><div class="impact-fill ${item.weight < 0 ? 'negative' : ''}" style="width:${width}%"></div></div></div>`; }).join('');
+    const graph = result.graph_url ? `<figure class="lime-figure"><div class="figure-head"><div><strong>Original LIME weight chart</strong><span>Generated by the backend for this exact assessment</span></div><a href="${escapeHTML(result.graph_url)}" target="_blank" rel="noopener">Open full size ↗</a></div><img src="${escapeHTML(result.graph_url)}" alt="LIME horizontal bar chart showing local feature weights for this prediction"><figcaption>Bars to the right have positive weight for the selected class; bars to the left have negative weight. Bar length represents the magnitude of local influence.</figcaption></figure>` : '';
+    const panel = $('#explanation'); panel.innerHTML = `<h3>What influenced this result</h3><p>LIME builds a small, interpretable approximation around this exact set of measurements. Longer bars represent stronger local influence on the selected class.</p><p class="explanation-note"><strong>How to read direction:</strong> “Supports result” pushed the approximation toward the displayed class; “opposes result” pushed away from it. Neither direction means medically healthy or unhealthy.</p>${rows}${graph}<p class="explanation-note">These influences can change when any input changes. They explain this prediction only and are not global feature importance or causal medical evidence.</p>`; panel.classList.remove('hidden');
+    button.remove(); state.lastExplanation = result; state.analytics.explanations += 1; setJourney(2);
+  } catch (error) { toast(error.message); button.disabled = false; } finally { setLoading(false); }
+}
+
+function updateAnalytics() {
+  const a = state.analytics; $('#metricAssessments').textContent = a.assessments; $('#metricExplanations').textContent = a.explanations;
+  $('#metricConfidence').textContent = a.assessments ? percent(a.confidenceTotal / a.assessments) : '—';
+  $('#metricResponse').textContent = a.assessments ? `${Math.round(a.responseTotal / a.assessments)} ms` : '—';
+  $('#classMix').innerHTML = Object.entries(a.classes).map(([label,count]) => { const share = a.assessments ? Math.round(count/a.assessments*100) : 0; return `<div class="mix-item ${label.toLowerCase()}"><div><span>${label}</span><strong>${count}</strong></div><div class="mix-track"><i style="width:${share}%"></i></div><small>${share}% of this session</small></div>`; }).join('');
+}
+
+function printAssessment() {
+  if (!state.lastInput || !state.lastResult) return;
+  const model = state.modelCard.model; const result = state.lastResult;
+  const probabilities = Object.entries(result.probabilities).map(([label,value]) => `<tr><th>${escapeHTML(label)}</th><td>${percent(value)}</td></tr>`).join('');
+  const inputs = Object.entries(state.lastInput).map(([name,value]) => `<tr><th>${escapeHTML(humanize(name))}</th><td>${escapeHTML(value)}</td></tr>`).join('');
+  const graph = state.lastExplanation?.graph_url ? `<img src="${escapeHTML(state.lastExplanation.graph_url)}" alt="LIME explanation chart">` : '<p>Generate an explanation before printing to include the LIME chart.</p>';
+  $('#printReport').innerHTML = `<header><h1>FetalCare XAI assessment report</h1><p>Generated ${new Date().toLocaleString()}</p></header><section><h2>Model result: ${escapeHTML(result.class_label)}</h2><p>Leading model probability: ${percent(result.confidence)}</p><table>${probabilities}</table></section><section><h2>CTG measurements</h2><table>${inputs}</table></section><section><h2>Local explanation</h2>${graph}</section><footer><strong>Research use only — not a diagnosis or medical device.</strong><p>Model version ${escapeHTML(model.version)} · Artifact ${escapeHTML(model.artifact_hash)}</p></footer>`;
+  window.print();
+}
+
+function handleComparison() {
+  if (!state.comparisonBase) {
+    state.comparisonBase = { input: { ...state.lastInput }, result: JSON.parse(JSON.stringify(state.lastResult)) };
+    $('#compareBtn').textContent = 'Saved as comparison A'; $('#compareBtn').disabled = true;
+    toast('Assessment A saved in memory. Change values and run another assessment.'); return;
+  }
+  renderComparison(state.comparisonBase, { input: state.lastInput, result: state.lastResult });
+}
+
+function resultSummary(label, snapshot) {
+  return `<article class="comparison-result"><span>Assessment ${label}</span><h3 class="${snapshot.result.class_label.toLowerCase()}">${escapeHTML(snapshot.result.class_label)}</h3><strong>${percent(snapshot.result.confidence)} confidence</strong>${Object.entries(snapshot.result.probabilities).map(([name,value]) => `<div class="compare-prob"><span>${name}</span><i><b style="width:${percent(value)}"></b></i><small>${percent(value)}</small></div>`).join('')}</article>`;
+}
+
+function renderComparison(base, current) {
+  const changed = state.schema.required.filter(name => Number(base.input[name]) !== Number(current.input[name]));
+  const rows = changed.map(name => { const before = base.input[name]; const after = current.input[name]; const delta = Number(after) - Number(before); return `<tr><th>${escapeHTML(humanize(name))}</th><td>${escapeHTML(before)}</td><td>${escapeHTML(after)}</td><td class="${delta > 0 ? 'up' : 'down'}">${delta > 0 ? '+' : ''}${Number(delta.toFixed(4))}</td></tr>`; }).join('');
+  $('#comparisonContent').innerHTML = `<div class="comparison-results">${resultSummary('A',base)}${resultSummary('B',current)}</div><section class="changed-values"><div class="comparison-subhead"><div><h3>Changed measurements</h3><p>${changed.length} of ${state.schema.required.length} values differ.</p></div><button class="button text" id="clearComparison" type="button">Clear saved A</button></div>${changed.length ? `<div class="table-scroll"><table><thead><tr><th>Measurement</th><th>A</th><th>B</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p>No measurement values changed.</p>'}</section>`;
+  $('#clearComparison').addEventListener('click', () => { state.comparisonBase = null; $('#comparisonDialog').close(); toast('Saved comparison cleared'); });
+  $('#comparisonDialog').showModal();
+}
+
+const classCopy = {
+  Normal: { title: 'Normal pattern class', text: 'The model assigns this when the input pattern most closely resembles its learned Normal class.', note: 'It does not confirm fetal wellbeing or remove the need for clinical interpretation.' },
+  Suspect: { title: 'Suspect pattern class', text: 'The model assigns this when the input pattern most closely resembles its learned intermediate or concerning class.', note: 'It is not a diagnosis or a standardized clinical escalation level.' },
+  Pathological: { title: 'Pathological pattern class', text: 'The model assigns this when the input pattern most closely resembles its learned Pathological class.', note: 'The application does not issue an emergency alert; qualified clinical evaluation is required.' }
+};
+function showClassExplanation(name) { const item = classCopy[name]; $('#classExplanation').innerHTML = `<span class="class-dot ${name.toLowerCase()}"></span><div><h3>${item.title}</h3><p>${item.text}</p><small>${item.note}</small></div>`; document.querySelectorAll('.class-tab').forEach(button => button.classList.toggle('active', button.dataset.class === name)); }
+
+function renderModelCard() {
+  const card = state.modelCard; const model = card.model; const metrics = card.evaluation.metrics;
+  $('#modelIdentity').innerHTML = `<div class="model-identity-main"><span class="live-badge"><i></i>Loaded model</span><h2>${escapeHTML(model.name)}</h2><p>${model.features} CTG features · ${model.classes.length} classes · ${escapeHTML(model.algorithm)}</p></div><div class="model-version"><span>Model version</span><strong>${escapeHTML(model.version)}</strong><small>Artifact ${escapeHTML(model.artifact_hash)}</small></div>`;
+  const items = [
+    ['Accuracy', metrics.accuracy, 'Overall recorded accuracy'],
+    ['Macro F1', metrics.macro_f1, 'Equal class weighting'],
+    ['ROC AUC', metrics.roc_auc_ovr, 'Not available'],
+  ];
+  $('#evaluationMetrics').innerHTML = items.map(([label,value,note]) => `<article class="evidence-metric ${value == null ? 'missing' : ''}"><span>${label}</span><strong>${value == null ? '—' : percent(value)}</strong><small>${note}</small></article>`).join('');
+  const dataset = card.provenance.dataset; const total = Object.values(dataset.class_counts).reduce((sum,count) => sum + count, 0);
+  $('#datasetProfile').innerHTML = `<section class="dataset-profile"><div class="dataset-summary"><div><span class="eyebrow">Supplied dataset</span><h3>${dataset.rows.toLocaleString()} labeled rows</h3><p>${dataset.model_features} model features from ${dataset.predictor_columns} predictors · ${dataset.missing_values} missing values · ${dataset.duplicate_rows} duplicate rows</p></div><small>SHA-256 ${escapeHTML(dataset.sha256.slice(0,12))}…</small></div><div class="provenance-line"><div><strong>Cardiotocography</strong><span>${escapeHTML(dataset.collection_context)}</span></div><div><a href="${escapeHTML(dataset.source_urls.uci)}" target="_blank" rel="noopener">UCI source ↗</a><a href="${escapeHTML(dataset.source_urls.kaggle)}" target="_blank" rel="noopener">Kaggle mirror ↗</a></div></div><div class="balance-bar">${Object.entries(dataset.class_counts).map(([label,count]) => `<i class="${label.toLowerCase()}" style="width:${count/total*100}%" title="${label}: ${count}"></i>`).join('')}</div><div class="balance-legend">${Object.entries(dataset.class_counts).map(([label,count]) => `<span><i class="${label.toLowerCase()}"></i><strong>${label}</strong> ${count} · ${Math.round(count/total*100)}%</span>`).join('')}</div><p class="dataset-warning">Class imbalance is substantial. Overall accuracy alone can hide weaker minority-class performance.</p><div class="dataset-citation"><strong>${escapeHTML(dataset.license)}</strong><span>${escapeHTML(dataset.citation)}</span></div></section>`;
+  const matrix = card.evaluation.confusion_matrix; const classNames = ['Normal','Suspect','Pathological']; const perClass = card.evaluation.per_class_metrics;
+  const lineage = card.evaluation.evaluation_split;
+  $('#diagnosticDashboard').innerHTML = `<section class="diagnostic-panel"><div class="diagnostic-head"><div><span class="eyebrow">Reconstructed held-out evaluation</span><h3>Confusion matrix & per-class measures</h3></div><span class="scope-badge verified">Verified match</span></div><p class="diagnostic-warning verified">${escapeHTML(card.evaluation.diagnostic_warning)}</p><div class="lineage-strip"><span><strong>${lineage.train_rows}</strong>Train rows</span><span><strong>${lineage.test_rows}</strong>Test rows</span><span><strong>80/20</strong>Stratified split</span><span><strong>${lineage.random_state}</strong>Random seed</span></div><div class="diagnostic-grid"><div class="matrix-wrap"><table class="confusion-matrix"><caption>Rows: actual · Columns: predicted</caption><thead><tr><th></th>${classNames.map(name => `<th>${name}</th>`).join('')}</tr></thead><tbody>${matrix.map((row,index) => `<tr><th>${classNames[index]}</th>${row.map((value,column) => `<td class="${index===column?'correct':'error'}"><strong>${value}</strong></td>`).join('')}</tr>`).join('')}</tbody></table></div><div class="per-class-list">${classNames.map(name => `<article><strong>${name}</strong><div><span>Precision <b>${percent(perClass[name].precision)}</b></span><span>Recall <b>${percent(perClass[name].recall)}</b></span><span>F1 <b>${percent(perClass[name].f1)}</b></span><span>Support <b>${perClass[name].support}</b></span></div></article>`).join('')}</div></div><div class="calibration-summary"><span><strong>${card.evaluation.calibration.multiclass_brier.toFixed(4)}</strong>Multiclass Brier</span><span><strong>${percent(card.evaluation.calibration.ece_10_bin)}</strong>10-bin ECE</span><p>Calibration diagnostics are calculated on the reconstructed 423-row held-out set.</p></div></section>`;
+}
+
+function bindEvents() {
+  document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => showView(button.dataset.view)));
+  document.querySelectorAll('[data-view-link]').forEach(button => button.addEventListener('click', () => showView(button.dataset.viewLink)));
+  $('#startAssessment').addEventListener('click', () => $('#assessmentWorkspace').scrollIntoView({ behavior: 'smooth' }));
+  $('#predictionForm').addEventListener('submit', runPrediction);
+  document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => loadPreset(button.dataset.preset)));
+  $('#predictionForm').addEventListener('input', updateCompletion);
+  $('#clearBtn').addEventListener('click', () => { $('#predictionForm').reset(); document.querySelectorAll('input.invalid').forEach(input => input.classList.remove('invalid')); $('#formAlert').classList.add('hidden'); updateCompletion(); });
+  $('#themeToggle').addEventListener('click', () => {
+    const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = nextTheme;
+    const label = `Switch to ${nextTheme === 'dark' ? 'light' : 'dark'} theme`;
+    $('#themeToggle').setAttribute('aria-label', label); $('#themeToggle').title = label;
+    document.querySelector('meta[name="theme-color"]').content = nextTheme === 'dark' ? '#0e1f1b' : '#123c36';
+  });
+  $('#resetAnalytics').addEventListener('click', () => { state.analytics = { assessments: 0, explanations: 0, confidenceTotal: 0, responseTotal: 0, classes: { Normal: 0, Suspect: 0, Pathological: 0 } }; updateAnalytics(); toast('Session analytics reset'); });
+  document.querySelectorAll('.class-tab').forEach(button => button.addEventListener('click', () => showClassExplanation(button.dataset.class)));
+  $('#featureSearch').addEventListener('input', event => renderFeatureReference(event.target.value));
+  $('#csvInput').addEventListener('change', event => { importCSV(event.target.files[0]); event.target.value = ''; });
+  $('#downloadTemplate').addEventListener('click', downloadCSVTemplate);
+  $('#closeComparison').addEventListener('click', () => $('#comparisonDialog').close());
+  $('#comparisonDialog').addEventListener('click', event => { if (event.target === $('#comparisonDialog')) $('#comparisonDialog').close(); });
+  showClassExplanation('Normal');
+}
+
+async function init() {
+  try { [state.schema, state.modelCard] = await Promise.all([request('/schema'), request('/model-card')]); renderSchema(); renderModelCard(); bindEvents(); updateAnalytics(); }
+  catch (error) { $('#formFields').innerHTML = `<div class="form-alert">${escapeHTML(error.message)} Refresh the page after the local API starts.</div>`; }
+}
+
+document.addEventListener('DOMContentLoaded', init);

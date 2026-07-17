@@ -50,6 +50,7 @@ htmlcov/
 # Flask
 instance/
 .webassets-cache
+backend/static/graphs/*.png
 
 # Data
 *.csv

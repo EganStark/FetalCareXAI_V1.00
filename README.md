@@ -1,449 +1,164 @@
-# 🏥 Fetal Health Prediction Application
+# FetalCare XAI
 
-<div align="center">
+An explainable machine-learning application for exploring fetal cardiotocography
+(CTG) patterns. FetalCare XAI combines a LightGBM classifier with LIME local
+explanations in a responsive, privacy-conscious Flask application.
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-2.3.3-green?logo=flask&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+> **Research and education only.** FetalCare XAI is not a medical device and
+> must not be used for diagnosis, triage, treatment, or patient monitoring.
 
-**🎯 AI-Powered Fetal Health Classification with Explainable Predictions**
+## Overview
 
-*Leveraging Machine Learning and LIME to provide interpretable predictions for fetal well-being assessment*
+The model evaluates 19 CTG measurements and estimates probabilities for three
+pattern classes:
 
-[View Demo](#quick-start) • [Documentation](#-api-endpoints) • [Contributing](CONTRIBUTING.md)
+- **Normal**
+- **Suspect**
+- **Pathological**
 
-</div>
+The interface presents the probability distribution, uncertainty guidance, a
+plain-language explanation, and the original LIME weight chart. Measurements
+and results remain transient in the browser tab; this release has no accounts,
+cloud history, or patient-record storage.
 
----
+## Highlights
 
-## ✨ Features at a Glance
+- Modern dark-first interface with a fully responsive light theme
+- Range-aware validation for all 19 model features
+- Verified Normal, Suspect, Pathological, and randomized demo inputs
+- Real model probabilities rather than simulated confidence values
+- LIME contribution summaries and generated weight charts
+- Privacy-safe, in-memory session analytics
+- CSV template download and validated CSV import
+- Printable assessment reports with browser-based PDF export
+- Temporary side-by-side assessment comparison
+- Versioned model card, dataset provenance, and held-out evaluation dashboard
+- Security headers, request limits, production error handling, and Docker support
 
-| Feature | Description |
-|---------|-------------|
-| 🎨 **Modern UI** | Clean, responsive design with intuitive user experience |
-| 🤖 **ML Prediction** | LightGBM classifier for accurate fetal health classification |
-| ✅ **Smart Validation** | Real-time input validation with helpful guidance |
-| 👁️ **Preview Mode** | Review your inputs before submitting predictions |
-| 🔍 **Explainable AI** | LIME-powered explanations showing which features influence predictions |
-| 💾 **Local Caching** | Auto-save inputs in browser localStorage for convenience |
-| ♿ **Accessibility** | High contrast mode, keyboard navigation support |
+## Verified evaluation
 
----
+The serialized production model was evaluated on a reconstructed, stratified
+20% test split. The reconstruction uses duplicate removal and `random_state=42`;
+its accuracy and macro F1 match the stored model metadata exactly.
 
-## 🛠️ Tech Stack
+| Metric | Value |
+|---|---:|
+| Test records | 423 |
+| Accuracy | 96.69% |
+| Macro F1 | 94.27% |
+| Weighted F1 | 96.55% |
+| ROC AUC, one-vs-rest | 98.99% |
 
-<div align="center">
+The Suspect class is the most difficult class, with held-out recall of 79.31%.
+See the in-application model card for the confusion matrix, per-class measures,
+calibration diagnostics, and limitations.
 
-| Category | Technologies |
-|----------|--------------|
-| **Backend** | Python 3.10+, Flask 2.3.3, scikit-learn, LIME |
-| **Frontend** | HTML5, CSS3, Vanilla JavaScript |
-| **ML/AI** | LightGBM, Standard Scaler, Explainable AI (LIME) |
-| **Model Format** | scikit-learn compatible .pkl files |
-| **Data Processing** | Pandas, NumPy |
+## Dataset
 
-</div>
+The project uses the Cardiotocography dataset: 2,126 CTG records, 21 measured
+predictors, no missing values, and fetal-state consensus labels assigned by
+three expert obstetricians. The deployed model uses 19 of those predictors.
 
----
+**Citation:** Campos, D. & Bernardes, J. (2000). *Cardiotocography* [Dataset].
+UCI Machine Learning Repository. <https://doi.org/10.24432/C51S4N>
 
-## 📁 Project Architecture
+- [Authoritative UCI repository](https://archive.ics.uci.edu/dataset/193/cardiotocography)
+- [Kaggle mirror](https://www.kaggle.com/datasets/andrewmvd/fetal-health-classification)
+- License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
-```
-fetal-health-prediction/
-│
-├── 🎯 backend/
-│   ├── app.py                 # Flask application entry point
-│   ├── model/
-│   │   ├── model.pkl          # 🤖 Trained LightGBM model
-│   │   ├── label_map.json     # Health classification labels
-│   │   ├── feature_metadata.json  # Feature ranges & definitions
-│   │   └── background_sample.csv  # Background data for LIME
-│   ├── services/
-│   │   ├── validate.py        # ✅ Input validation logic
-│   │   ├── predict.py         # 🎯 Prediction engine
-│   │   └── explain.py         # 🔍 LIME explanation service
-│   └── static/
-│       ├── index.html         # Web interface
-│       ├── app.js             # Frontend logic
-│       └── styles.css         # Styling & theming
-├── 🧪 tests/
-│   ├── test_api.py           # API endpoint tests
-│   └── test_model_direct.py  # Model validation tests
-├── 📋 requirements.txt        # Python dependencies
-├── 📝 README.md              # This file
-└── 📜 LICENSE                # MIT License
-```
+## Technology
 
----
+| Layer | Technologies |
+|---|---|
+| Application | Python 3.12, Flask, Gunicorn |
+| Model | LightGBM, scikit-learn, Joblib |
+| Explainability | LIME, Matplotlib |
+| Interface | Semantic HTML, modern CSS, vanilla JavaScript |
+| Quality | pytest, GitHub Actions, Docker |
 
-## 🚀 Quick Start (5 Minutes)
+## Local development
 
-### Prerequisites
-- Python 3.10 or higher
-- pip (Python package manager)
+### Requirements
 
-### Step 1️⃣ Install Dependencies
+- Python 3.12
+- `uv` or `pip`
+
+### Setup with `uv`
+
 ```bash
-pip install -r requirements.txt
+uv python install 3.12.11
+uv venv --python 3.12.11 .venv
+uv pip install --python .venv/Scripts/python.exe -r requirements.txt
 ```
 
-### Step 2️⃣ Place Your Model
-Place your trained model as `backend/model/model.pkl`:
-- ✅ Must accept 19 input features (see list below)
-- ✅ Return predictions: **1=Normal** | **2=Suspect** | **3=Pathological**
-- ✅ Must be scikit-learn compatible
+On macOS or Linux, replace `.venv/Scripts/python.exe` with
+`.venv/bin/python`.
 
-### Step 3️⃣ Start the Server
+### Run
+
 ```bash
 python start_app.py
 ```
 
-### Step 4️⃣ Open in Browser
-Navigate to: **http://127.0.0.1:5000** 🎉
+Open <http://127.0.0.1:5000>. The health endpoint is available at
+<http://127.0.0.1:5000/health>.
 
----
+### Test
 
-## 📊 Features Overview
-
-### Input Features (19 Cardiotocography Indicators)
-
-The application analyzes **19 cardiotocography parameters** for comprehensive fetal assessment:
-
-#### 🫀 Heart Rate Parameters
-| # | Feature | Range | Unit |
-|---|---------|-------|------|
-| 1 | **Baseline Value** | 106.0 - 160.0 | BPM |
-| 2 | **Accelerations** | 0.0 - 0.020 | per second |
-| 3 | **Light Decelerations** | 0.0 - 0.020 | per second |
-| 4 | **Severe Decelerations** | 0.0 - 0.005 | per second |
-| 5 | **Prolonged Decelerations** | 0.0 - 0.010 | per second |
-
-#### 📈 Variability Measures
-| # | Feature | Range |
-|---|---------|-------|
-| 6 | **Mean Short-Term Variability** | 0.2 - 7.0 |
-| 7 | **Abnormal Short-Term Variability %** | 0.0 - 100.0 |
-| 8 | **Mean Long-Term Variability** | 1.0 - 100.0 |
-| 9 | **Abnormal Long-Term Variability %** | 0.0 - 100.0 |
-
-#### 📊 Histogram Metrics
-| # | Feature | Range |
-|---|---------|-------|
-| 10 | **Histogram Width** | 3.0 - 180.0 |
-| 11 | **Histogram Min** | 50.0 - 170.0 |
-| 12 | **Histogram Max** | Not capped |
-| 13 | **Histogram Mean** | 70.0 - 180.0 |
-| 14 | **Histogram Median** | 70.0 - 180.0 |
-| 15 | **Histogram Mode** | 60.0 - 180.0 |
-| 16 | **Histogram Variance** | 0.0 - 300.0 |
-| 17 | **Histogram Tendency** | -1.0 to 1.0 |
-| 18 | **Histogram Peaks** | 0.0 - 18.0 |
-
-#### 🐣 Additional Parameters
-| # | Feature | Range |
-|---|---------|-------|
-| 19 | **Uterine Contractions** | 0.0 - 0.020 | per second |
-| 20 | **Fetal Movement** | 0.0 - 0.500 |
-
-### 📤 Output Classification
-
-The model predicts one of **three health states**:
-
-```
-┌─────────────────────────────────────────┐
-│  1️⃣  Normal (Healthy)                   │
-│      ✅ No intervention needed           │
-├─────────────────────────────────────────┤
-│  2️⃣  Suspect (Concerning)              │
-│      ⚠️  Requires closer monitoring     │
-├─────────────────────────────────────────┤
-│  3️⃣  Pathological (Critical)           │
-│      🚨 Immediate intervention required │
-└─────────────────────────────────────────┘
-```
-
----
-
-## 🔌 API Endpoints
-
-### Health Check
-```http
-GET /health
-```
-**Response:**
-```json
-{
-  "status": "ok",
-  "message": "Fetal Health Prediction API is running",
-  "model_info": {...}
-}
-```
-
-### Get Schema
-```http
-GET /schema
-```
-Returns feature definitions and label mapping.
-
-### Preview Data
-```http
-POST /preview
-Content-Type: application/json
-```
-Validate input before prediction.
-
-### Make Prediction ⭐
-```http
-POST /predict
-Content-Type: application/json
-```
-
-**Request Example:**
-```json
-{
-  "prolongued_decelerations": 0.0,
-  "abnormal_short_term_variability": 12.4,
-  "percentage_of_time_with_abnormal_long_term_variability": 0.0,
-  "histogram_mean": 120.0,
-  "histogram_mode": 120.0,
-  "histogram_median": 120.0,
-  "accelerations": 0.0,
-  "histogram_variance": 25.0,
-  "baseline value": 120.0,
-  "mean_value_of_short_term_variability": 1.5,
-  "uterine_contractions": 0.0,
-  "histogram_min": 100.0,
-  "mean_value_of_long_term_variability": 15.0,
-  "light_decelerations": 0.0,
-  "histogram_width": 40.0,
-  "histogram_tendency": 0.0,
-  "severe_decelerations": 0.0,
-  "histogram_number_of_peaks": 3.0,
-  "fetal_movement": 0.0
-}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "class_id": 1,
-  "class_label": "Normal",
-  "confidence": 0.95,
-  "input_data": {...}
-}
-```
-
-### Get Explanation 🔍
-```http
-POST /explain
-Content-Type: application/json
-```
-
-Provides **LIME-powered explanations** showing feature contributions:
-
-**Response:**
-```json
-{
-  "status": "success",
-  "class_label": "Normal",
-  "explanations": [
-    {
-      "feature": "histogram_mean",
-      "value": 120.0,
-      "weight": 0.2345,
-      "impact": "Positive"
-    },
-    {
-      "feature": "baseline value",
-      "value": 120.0,
-      "weight": 0.1890,
-      "impact": "Positive"
-    }
-  ],
-  "visualization": "<html>...</html>"
-}
-```
-
----
-
-## 🧪 Testing
-
-Run the comprehensive test suite:
 ```bash
-cd project
-python -m pytest tests/ -v
+python -m pytest -q
 ```
 
-Test coverage includes:
-- ✅ API endpoint validation
-- ✅ Model loading & inference
-- ✅ Input validation logic
-- ✅ LIME explanation generation
-- ✅ Data preprocessing
+## API
 
----
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/health` | Service and model health |
+| `GET` | `/schema` | Feature definitions and accepted ranges |
+| `GET` | `/model-card` | Versioned provenance and evaluation evidence |
+| `POST` | `/preview` | Validate a measurement payload |
+| `POST` | `/predict` | Return class probabilities and classification |
+| `POST` | `/explain` | Generate a local LIME explanation |
 
-## 🔧 Configuration & Customization
+Prediction and explanation requests accept a JSON object containing exactly the
+19 features returned by `/schema`.
 
-### Update Model
-1. Train your model on the 19 features
-2. Save: `joblib.dump(model, 'backend/model/model.pkl')`
-3. Place in: `backend/model/model.pkl`
-4. Restart the application
+## Project structure
 
-### Customize Features
-Edit `backend/model/feature_metadata.json`:
-```json
-{
-  "features": {
-    "baseline value": {
-      "min": 100.0,
-      "max": 180.0,
-      "description": "Baseline heart rate"
-    }
-  }
-}
+```text
+backend/
+  app.py                   Flask routes and production safeguards
+  model/                   Serialized model, metadata, and evaluation summary
+  services/                Validation, prediction, and explanation services
+  static/                  Application interface
+tests/                     Maintained pytest suite
+DEPLOYMENT.md              Hosting and production checklist
+EVALUATION_ARTIFACTS.md    Evaluation lineage and artifact requirements
+Dockerfile                 Reproducible production container
+render.yaml                Render service blueprint
 ```
 
-### Update Styling
-Modify `backend/static/styles.css`:
-```css
-:root {
-  --primary-color: #2563eb;
-  --secondary-color: #10b981;
-  --danger-color: #ef4444;
-}
-```
+## Deployment
 
----
+The recommended first production target is a Docker-based Render web service.
+The native LightGBM runtime and LIME/Matplotlib dependencies are a better fit for
+a container than a Vercel serverless function. See [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## ⚠️ Troubleshooting
+## Privacy and responsible use
 
-| Issue | Solution |
-|-------|----------|
-| **Model not found** | Ensure `model.pkl` exists in `backend/model/` |
-| **Port 5000 in use** | Change port in `start_app.py` or kill process using it |
-| **LIME errors** | Verify `background_sample.csv` or synthetic data generation |
-| **Import errors** | Run `pip install -r requirements.txt` again |
+- Do not submit identifiable patient information.
+- Raw CTG measurements are not sent to analytics or stored as history.
+- Session analytics are aggregated in memory and disappear on refresh.
+- LIME explains local model behavior; it does not establish clinical causality.
+- External clinical validation and applicable regulatory review are required
+  before any clinical use.
 
----
+## Contributing
 
-## 📚 Understanding LIME Explanations
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, testing, and model-change
+requirements.
 
-**LIME** (Local Interpretable Model-agnostic Explanations) explains individual predictions by:
+## License
 
-1. **Perturbing** the input features randomly
-2. **Training** a simple linear model on perturbations
-3. **Extracting** feature weights showing importance
-4. **Visualizing** which features pushed the model toward the prediction
-
-This makes the "black box" model transparent! 🔍
-
----
-
-## 📝 Project Workflow
-
-```
-┌────────────────┐
-│   USER INPUT   │  Enter 19 cardiotocography features
-└────────┬───────┘
-         │
-         ▼
-┌────────────────────┐
-│    VALIDATION      │  Check ranges & data types
-└────────┬───────────┘
-         │
-         ▼
-┌────────────────────┐
-│   PREPROCESSING    │  Standardization & scaling
-└────────┬───────────┘
-         │
-         ▼
-┌────────────────────┐
-│   ML PREDICTION    │  LightGBM inference
-└────────┬───────────┘
-         │
-         ▼
-┌────────────────────┐
-│  LIME EXPLANATION  │  Generate interpretability
-└────────┬───────────┘
-         │
-         ▼
-┌────────────────────┐
-│   VISUALIZATION    │  UI presentation
-└────────────────────┘
-```
-
----
-
-## 🎓 How It Works
-
-### 1. **Input Collection** 📝
-User inputs 19 cardiotocography measurements through the web interface.
-
-### 2. **Validation** ✅
-- Range checks against predefined limits
-- Data type verification
-- Real-time feedback
-
-### 3. **Preprocessing** 🔧
-- Features are standardized using StandardScaler
-- Ensures model compatibility
-
-### 4. **Prediction** 🤖
-LightGBM model classifies fetal health:
-- **High Confidence** → Strong prediction
-- **Low Confidence** → Requires review
-
-### 5. **Explanation** 🔍
-LIME generates human-interpretable explanation:
-- Top 10 contributing features
-- Positive vs. negative impacts
-- Why the model made this decision
-
-### 6. **Results Display** 📊
-Interactive visualization showing:
-- Classification result (Normal/Suspect/Pathological)
-- Confidence score
-- Feature importance chart
-- Detailed explanations
-
----
-
-## 📊 Performance Metrics
-
-- **Inference Speed**: < 100ms per prediction
-- **LIME Explanation Generation**: < 2 seconds
-- **Model Accuracy**: Depends on training data
-- **Memory Footprint**: ~150MB with dependencies
-
----
-
-## ⚖️ License
-
-This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file for details.
-
-### Important Notice ⚠️
-This is an educational/research tool. Medical predictions should always be validated by qualified healthcare professionals. Not for clinical decision-making without proper validation and regulatory approval.
-
----
-
-## 🙏 Acknowledgments
-
-- 🎓 Built with educational purposes in mind
-- 🏥 Inspired by cardiotocography research
-- 🤖 Powered by cutting-edge ML technologies
-- 🔍 LIME library for explainability
-
----
-
-<div align="center">
-
-### ⭐ If you found this project helpful, please give it a star! ⭐
-
-**Made with ❤️ for better maternal and fetal healthcare**
-
-[Back to Top](#-fetal-health-prediction-application)
-
-</div>
+Application source code is available under the [MIT License](LICENSE). Dataset
+use remains subject to the dataset's CC BY 4.0 terms and attribution requirements.

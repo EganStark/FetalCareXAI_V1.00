@@ -1,0 +1,85 @@
+{
+  "dataset": {
+    "filename": "fetal_health.csv",
+    "sha256": "90bd62b95020ffa466f01a2942a79cf6b8b04cc5ac680144d705002d893f6622",
+    "rows": 2126,
+    "predictor_columns": 21,
+    "model_features": 19,
+    "excluded_predictors": ["histogram_max", "histogram_number_of_zeroes"],
+    "missing_values": 0,
+    "duplicate_rows": 13,
+    "class_counts": {"Normal": 1655, "Suspect": 295, "Pathological": 176},
+    "class_proportions": {"Normal": 0.778457, "Suspect": 0.138758, "Pathological": 0.082785},
+    "source": "UCI Machine Learning Repository Cardiotocography dataset, mirrored on Kaggle",
+    "source_urls": {
+      "uci": "https://archive.ics.uci.edu/dataset/193/cardiotocography",
+      "kaggle": "https://www.kaggle.com/datasets/andrewmvd/fetal-health-classification"
+    },
+    "citation": "Campos, D. & Bernardes, J. (2000). Cardiotocography [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C51S4N",
+    "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+    "collection_context": "2,126 fetal cardiotocograms automatically processed; diagnostic features measured and consensus labels assigned by three expert obstetricians"
+  },
+  "preserved_evaluation": {
+    "accuracy": 0.966903073286052,
+    "macro_f1": 0.9427483263548838,
+    "split_indices_available": true,
+    "lineage": {
+      "notebook": "fetal-health-v2.ipynb",
+      "duplicate_policy": "drop_duplicates(keep='first')",
+      "split": "stratified 80/20",
+      "random_state": 42,
+      "rows_after_deduplication": 2113,
+      "train_rows": 1690,
+      "test_rows": 423,
+      "test_indices_sha256": "de1bcdca552edb2e1785c48d306321b749a8fd27204bc7963e156fa4d2dfd274",
+      "verification": "Reconstructed accuracy and macro F1 exactly match metadata.json"
+      ,"poster_support": "Capstone poster reports test n=423, stratified 80/20 split, training-only SMOTE, and a final LightGBM table accuracy of 96.69%"
+      ,"poster_discrepancy": "Poster narrative also contains an older 96.45% result; deployed metadata and reconstruction support 96.69%"
+    }
+  },
+  "held_out_evaluation": {
+    "accuracy": 0.966903073286052,
+    "macro_f1": 0.9427483263548838,
+    "weighted_f1": 0.9655451654754061,
+    "roc_auc_ovr": 0.989928385893681,
+    "log_loss": 0.166729545038933,
+    "multiclass_brier": 0.06314872326466515,
+    "ece_10_bin": 0.027322097552133905,
+    "test_class_counts": {"Normal": 330, "Suspect": 58, "Pathological": 35},
+    "confusion_matrix": [[329, 1, 0], [11, 46, 1], [1, 0, 34]],
+    "per_class": {
+      "Normal": {"precision": 0.964809, "recall": 0.99697, "f1": 0.980626, "support": 330},
+      "Suspect": {"precision": 0.978723, "recall": 0.793103, "f1": 0.87619, "support": 58},
+      "Pathological": {"precision": 0.971429, "recall": 0.971429, "f1": 0.971429, "support": 35}
+    },
+    "calibration_bins": [
+      {"range": "0.5-0.6", "count": 2, "accuracy": 0.5, "confidence": 0.579099},
+      {"range": "0.6-0.7", "count": 3, "accuracy": 1.0, "confidence": 0.672267},
+      {"range": "0.7-0.8", "count": 7, "accuracy": 0.857143, "confidence": 0.769869},
+      {"range": "0.8-0.9", "count": 8, "accuracy": 0.875, "confidence": 0.864726},
+      {"range": "0.9-1.0", "count": 403, "accuracy": 0.972705, "confidence": 0.996831}
+    ]
+  },
+  "resubstitution_diagnostic": {
+    "warning": "Calculated on the complete supplied dataset, which may include training rows. Do not interpret as held-out performance.",
+    "accuracy": 0.9924741298212606,
+    "macro_f1": 0.9879358848810704,
+    "weighted_f1": 0.9924084494295843,
+    "log_loss": 0.034953023886520156,
+    "multiclass_brier": 0.013509656697872718,
+    "ece_10_bin": 0.004967005330991528,
+    "confusion_matrix": [[1654, 1, 0], [13, 281, 1], [1, 0, 175]],
+    "per_class": {
+      "Normal": {"precision": 0.991607, "recall": 0.999396, "f1": 0.995486, "support": 1655},
+      "Suspect": {"precision": 0.996454, "recall": 0.952542, "f1": 0.974003, "support": 295},
+      "Pathological": {"precision": 0.994318, "recall": 0.994318, "f1": 0.994318, "support": 176}
+    },
+    "calibration_bins": [
+      {"range": "0.5-0.6", "count": 6, "accuracy": 0.5, "confidence": 0.527599},
+      {"range": "0.6-0.7", "count": 3, "accuracy": 1.0, "confidence": 0.672267},
+      {"range": "0.7-0.8", "count": 7, "accuracy": 0.857143, "confidence": 0.769869},
+      {"range": "0.8-0.9", "count": 8, "accuracy": 0.875, "confidence": 0.864726},
+      {"range": "0.9-1.0", "count": 2102, "accuracy": 0.994767, "confidence": 0.998914}
+    ]
+  }
+}
